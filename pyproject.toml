@@ -5,6 +5,8 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
+    "black>=25.1.0",
+    "openai>=1.61.1",
     "polars>=1.22.0",
     "skypilot[lambda]>=0.7.0",
 ]
