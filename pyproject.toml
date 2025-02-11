@@ -8,7 +8,7 @@ dependencies = [
     "black>=25.1.0",
     "openai>=1.61.1",
     "polars>=1.22.0",
-    "skypilot[lambda]>=0.7.0",
+    "skypilot[lambda,runpod,vast,cudo]>=0.7.0",
 ]
 
 [tool.uv]
