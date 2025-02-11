@@ -1,3 +1,6 @@
 __pycache__/
 .env
+.gcloud.json
 .venv
+experiments/data/chat-completions/
+experiments/data/chat-completion-logs/

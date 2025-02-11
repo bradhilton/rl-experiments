@@ -10,12 +10,12 @@ from openai.types.chat.chat_completion_message_tool_call import (
     ChatCompletionMessageToolCall,
     Function,
 )
-from typing import Callable
+from typing import Any, Callable
 
 
 async def consume_chat_completion_stream(
     stream: AsyncStream[ChatCompletionChunk],
-    on_chunk: Callable[[ChatCompletionChunk, ChatCompletion], None] | None = None,
+    on_chunk: Callable[[ChatCompletionChunk, ChatCompletion], Any] | None = None,
 ) -> ChatCompletion:
     chat_completion: ChatCompletion | None = None
     async for chunk in stream:
