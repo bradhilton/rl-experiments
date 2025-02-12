@@ -2,6 +2,16 @@
 
 OpenPipe Reinforcement Learning Experiments
 
+## Dependencies
+
+Install project dependencies using `uv`:
+
+```bash
+uv sync
+```
+
+This will install all dependencies specified in `pyproject.toml` and create a virtual environment at `.venv`.
+
 ## Environment Setup
 
 1. Create your environment file by copying the example:
