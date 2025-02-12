@@ -478,7 +478,7 @@ wheels = [
 
 [[package]]
 name = "cudo-compute"
-version = "0.3.6"
+version = "0.1.10"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "certifi" },
@@ -487,9 +487,9 @@ dependencies = [
     { name = "six" },
     { name = "urllib3" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/b9/45/81d232fef5a46e506aaa1f660ea8236dd886233eccc8fc26227b50417adc/cudo_compute-0.3.6.tar.gz", hash = "sha256:0cff29d873f0b0686a16e77e92871cdb261623a2aaab0a983f7b318420520bc9", size = 460680 }
+sdist = { url = "https://files.pythonhosted.org/packages/e9/65/1f8aa5a2ea70f2eb2d3895e3811139da7bc2100c6efaaa5024671834bd3c/cudo_compute-0.1.10.tar.gz", hash = "sha256:3546f4eace04e08e3af4ec3987e1439c9c8f39eba2516ee6be5dc2e444b23c9f", size = 364513 }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/8a/06/fc198cc9bc0170fcc07344c04af5de3a70a67b30aa040120f06415e76c65/cudo_compute-0.3.6-py3-none-any.whl", hash = "sha256:1b72a8f09333106fe9c350d0b35171dce2b339752036f64c38096f4e20d6b5d1", size = 380302 },
+    { url = "https://files.pythonhosted.org/packages/dc/28/ca58e7aac1ca142390284aed5ba45b75947d25256256f4bcb4ccc960b3fa/cudo_compute-0.1.10-py3-none-any.whl", hash = "sha256:a3bb3c5f4bf6afb157ec8e8494b1ebd4deb09e2dff8e14ed0780e99b201329d7", size = 289162 },
 ]
 
 [[package]]
@@ -1309,6 +1309,7 @@ version = "0.1.0"
 source = { virtual = "." }
 dependencies = [
     { name = "black" },
+    { name = "cudo-compute" },
     { name = "obstore" },
     { name = "openai" },
     { name = "polars" },
@@ -1324,6 +1325,7 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "black", specifier = ">=25.1.0" },
+    { name = "cudo-compute", specifier = "==0.1.10" },
     { name = "obstore", specifier = ">=0.4.0" },
     { name = "openai", specifier = ">=1.61.1" },
     { name = "polars", specifier = ">=1.22.0" },

@@ -380,17 +380,19 @@
 #       nvidia\_gpus:
 #           disable\_ecc: ...
 
+workdir: .
 resources:
   accelerators: A100
 envs:
   GIT_USER_NAME: "Your Name"
   GIT_USER_EMAIL: "your.email@example.com"
-  GITHUB_TOKEN: ""
+  GITHUB_TOKEN:
 setup: |
   git config --global user.name "${GIT_USER_NAME}"
   git config --global user.email "${GIT_USER_EMAIL}"
+  sudo snap install --classic astral-uv
+  uv sync
   cd ..
   git clone https://oauth2:${GITHUB_TOKEN}@github.com/bradhilton/openpipe-rl.git
   cd openpipe-rl
-  sudo snap install --classic astral-uv
   uv sync

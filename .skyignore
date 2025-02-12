@@ -1,1 +1,3 @@
 .venv
+experiments/data/chat-completion-logs/
+experiments/data/chat-completions/
