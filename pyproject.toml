@@ -11,6 +11,9 @@ dependencies = [
     "openai>=1.61.1",
     "polars>=1.22.0",
     "skypilot[lambda,runpod,cudo]>=0.7.0",
+    "torch>=2.5.1",
+    "torchao>=0.8.0",
+    "torchtune>=0.5.0",
     "vllm>=0.7.0",
 ]
 
