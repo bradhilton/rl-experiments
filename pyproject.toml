@@ -11,10 +11,12 @@ dependencies = [
     "openai>=1.61.1",
     "polars>=1.22.0",
     "skypilot[lambda,runpod,cudo]>=0.7.0",
+    "vllm>=0.7.0",
 ]
 
 [tool.uv]
 dev-dependencies = [
     "huggingface-hub[cli]>=0.28.1",
     "ipykernel>=6.29.5",
+    "ipywidgets>=8.1.5",
 ]
