@@ -1,4 +1,4 @@
-from .task import Task
+from .tasks import Task
 
 
 def train() -> None: ...
