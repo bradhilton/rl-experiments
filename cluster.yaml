@@ -399,7 +399,3 @@ setup: |
   sudo snap install --classic astral-uv
   # Sync the dependencies
   uv sync
-  # cd ..
-  # git clone https://oauth2:${GITHUB_TOKEN}@github.com/bradhilton/openpipe-rl.git
-  # cd openpipe-rl
-  # uv sync
