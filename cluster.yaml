@@ -392,7 +392,7 @@ setup: |
   git config --global user.email "${GIT_USER_EMAIL}"
   sudo snap install --classic astral-uv
   uv sync
-  cd ..
-  git clone https://oauth2:${GITHUB_TOKEN}@github.com/bradhilton/openpipe-rl.git
-  cd openpipe-rl
-  uv sync
+  # cd ..
+  # git clone https://oauth2:${GITHUB_TOKEN}@github.com/bradhilton/openpipe-rl.git
+  # cd openpipe-rl
+  # uv sync

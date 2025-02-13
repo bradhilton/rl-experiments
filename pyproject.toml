@@ -13,7 +13,7 @@ dependencies = [
     "openai>=1.61.1",
     "polars>=1.22.0",
     "seaborn>=0.13.2",
-    "skypilot[lambda,runpod,cudo]>=0.7.0",
+    "skypilot[cudo,lambda,runpod]>=0.8.0",
     "torch>=2.5.1",
     "torchao>=0.8.0",
     "torchtune",
