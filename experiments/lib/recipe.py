@@ -658,6 +658,8 @@ class TuneRecipe(FTRecipeInterface):
                 "FSDP is enabled. Instantiating model and loading checkpoint on Rank 0 ..."
             )
             init_start = time.perf_counter()
+        else:
+            init_start = 0.0
 
         with (
             training.set_default_dtype(self._dtype),
@@ -898,6 +900,8 @@ class TuneRecipe(FTRecipeInterface):
                 "Saving checkpoint. This may take some time. Retrieving full model state dict..."
             )
             start = time.perf_counter()
+        else:
+            start = 0.0
 
         # To prevent GPU memory from spiking during checkpoint save,
         # we consolidate the full model and optim state dicts on CPU for rank 0
@@ -1018,6 +1022,7 @@ class TuneRecipe(FTRecipeInterface):
             self._sampler.set_epoch(curr_epoch)
 
             pbar = tqdm(total=self._steps_per_epoch, disable=not (rank == 0))
+            grad_norm: torch.Tensor | None = None
             for idx, batch in enumerate(self._dataloader):
                 if (
                     self.max_steps_per_epoch is not None
@@ -1113,6 +1118,7 @@ class TuneRecipe(FTRecipeInterface):
                 current_result = self._loss_fn.forward(
                     logits=logits,
                     tokens=batch["tokens"],
+                    mask=batch["assistant_mask"],
                     bos_id=bos_id,
                 )
                 del logits, batch

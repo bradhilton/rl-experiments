@@ -12,3 +12,5 @@ git config --global user.email "$GIT_USER_EMAIL"
 gcloud auth activate-service-account --key-file .gcloud.json
 sudo snap install --classic astral-uv
 uv sync
+uv remove torchtune
+uv add git+https://github.com/pytorch/torchtune --rev 4b6877a6ef31a1f987c27594eaf8fe467b5ab785

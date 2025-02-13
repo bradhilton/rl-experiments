@@ -74,6 +74,7 @@ class GRPO(torch.nn.Module):
         self,
         logits: Union[torch.Tensor, list[torch.Tensor]],
         tokens: torch.Tensor,
+        mask: torch.Tensor,
         bos_id: int,
     ) -> GRPOResult:
         """
@@ -87,6 +88,9 @@ class GRPO(torch.nn.Module):
             tokens (Tensor):
                 Shape: (batch_size, sequence_length)
                 Token indices.
+            mask (Tensor):
+                Shape: (batch_size, sequence_length)
+                Mask specifying positions where loss should be computed.
             bos_id (int):
                 Index of the beginning of sequence token in the vocabulary.
 
@@ -99,16 +103,18 @@ class GRPO(torch.nn.Module):
             for chunked_args in zip(
                 logits,
                 tokens.chunk(num_chunks, dim=1),
+                mask.chunk(num_chunks, dim=1),
             ):
                 result += self._forward_chunk(*chunked_args, bos_id)
             return result
 
-        return self._forward_chunk(logits, tokens, bos_id)
+        return self._forward_chunk(logits, tokens, mask, bos_id)
 
     def _forward_chunk(
         self,
         logits: torch.Tensor,
         tokens: torch.Tensor,
+        mask: torch.Tensor,
         bos_id: int,
     ) -> GRPOResult:
         """
@@ -119,10 +125,11 @@ class GRPO(torch.nn.Module):
         tokens = shift_tensor(tokens, bos_id).view(
             -1
         )  # (batch_size * sequence_length,)
+        mask = shift_tensor(mask, False).view(-1)  # (batch_size * sequence_length,)
         dist = torch.distributions.Categorical(logits=logits)
-        log_probs = dist.log_prob(tokens)
-        ce_loss = -log_probs.sum()
+        logprobs = dist.log_prob(tokens)[mask]
+        ce_loss = -logprobs.sum()
         return GRPOResult(
-            num_tokens=torch.tensor(tokens.numel(), device=tokens.device),
+            num_tokens=mask.sum(),
             ce_loss=ce_loss,
         )
