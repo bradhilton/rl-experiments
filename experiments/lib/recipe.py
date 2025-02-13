@@ -44,7 +44,7 @@ from warnings import warn
 from .mlp_head_checkpointer import MLP_HEAD_KEY, MLPHeadCheckpointer
 from .mlp_head import MLPHead
 from .pack import PackedTensors
-from .ppo import PPOLoss, PPOResult, shift_tensor
+from .grpo import GRPO, GRPOResult, shift_tensor
 
 log = utils.get_logger("DEBUG")
 
@@ -120,7 +120,7 @@ class TuneRecipeConfig(DictConfig):
         max_steps_per_epoch: Optional[int] = None,
         metric_logger: ComponentConfig[MetricLoggerInterface] = PLACEHOLDER,
         model: ComponentConfig[TransformerDecoder] = PLACEHOLDER,
-        loss: ComponentConfig[PPOLoss] = ComponentConfig(PPOLoss),
+        loss: ComponentConfig[GRPO] = ComponentConfig(GRPO),
         dataset: ComponentConfig[Dataset[PackedTensors]] = PLACEHOLDER,
         shuffle: bool = False,
         batch_size: int = 1,
@@ -1008,7 +1008,7 @@ class TuneRecipe(FTRecipeInterface):
 
         # Initialize tokens count and running loss (for grad accumulation)
         t0 = time.perf_counter()
-        running_result = PPOResult().to(self._device)
+        running_result = GRPOResult().to(self._device)
 
         self._profiler.start()
         # self.epochs_run should be non-zero when we're resuming from a checkpoint
@@ -1094,7 +1094,7 @@ class TuneRecipe(FTRecipeInterface):
                     # Restore original weights
                     self._swap_state(model_state_dict)
                 else:
-                    reference_logprobs = batch["reference_logprobs"]
+                    reference_logprobs = None
 
                 with self.activations_handling_ctx:
                     hidden_states, logits = self._model(
@@ -1104,22 +1104,15 @@ class TuneRecipe(FTRecipeInterface):
                     )
                 del mask, batch["input_pos"]  # type: ignore
 
-                mlp_head_preds = self._value_head(hidden_states)
-                if self._loss_fn.advantage_prediction_coef == 0:
-                    mlp_head_preds = mlp_head_preds.detach()
-                del hidden_states
+                # mlp_head_preds = self._value_head(hidden_states)
+                # if self._loss_fn.advantage_prediction_coef == 0:
+                #     mlp_head_preds = mlp_head_preds.detach()
+                # del hidden_states
 
                 # Compute loss
                 current_result = self._loss_fn.forward(
                     logits=logits,
-                    value_predictions=mlp_head_preds,
                     tokens=batch["tokens"],
-                    values=batch["values"],
-                    advantages=batch["advantages"],
-                    logprobs=batch["logprobs"],
-                    reference_logprobs=reference_logprobs,
-                    weights=batch["weights"],
-                    model_ids=batch["model_ids"],
                     bos_id=bos_id,
                 )
                 del logits, batch
@@ -1160,58 +1153,13 @@ class TuneRecipe(FTRecipeInterface):
 
                     per_token_result = running_result.per_token()
                     loss_to_log = per_token_result.total_loss.item()
-                    policy_to_log = per_token_result.policy_loss.item()
-                    unclipped_policy_to_log = (
-                        per_token_result.unclipped_policy_loss.item()
-                    )
-                    tanh_log_policy_to_log = (
-                        per_token_result.tanh_log_policy_loss.item()
-                    )
-                    reinforce_to_log = per_token_result.reinforce_loss.item()
-                    advantage_prediction_to_log = (
-                        per_token_result.advantage_prediction_loss.item()
-                    )
-                    advantage_to_log = per_token_result.advantage_loss.item()
-                    value_to_log = per_token_result.value_loss.item()
-                    convergence_to_log = per_token_result.convergence_loss.item()
-                    divergence_to_log = per_token_result.divergence_loss.item()
-                    entropy_to_log = per_token_result.entropy_bonus.item()
-                    entropy_target_to_log = per_token_result.entropy_target_loss.item()
-                    kl_div_to_log = per_token_result.kl_divergence.item()
-                    self_kl_to_log = per_token_result.self_kl_divergence.item()
-                    peer_kl_to_log = per_token_result.peer_kl_divergence.item()
-                    ce_to_log = per_token_result.ce_loss.item()
-                    weighted_entropy_to_log = (
-                        per_token_result.weighted_entropy_bonus.item()
-                    )
-                    weighted_kl_div_to_log = (
-                        per_token_result.weighted_kl_divergence.item()
-                    )
-                    weighted_ce_to_log = per_token_result.weighted_ce_loss.item()
                     pbar.update(1)
                     pbar.set_description(
                         f"{curr_epoch + 1}|{self.global_step}|Loss: {loss_to_log:.4f}"
                     )
                     pbar.set_postfix(
                         lr=get_lr(self._optimizer or self._optim_ckpt_wrapper),
-                        # policy=f"{policy_to_log:.4f}",
-                        # unclipped_policy=f"{unclipped_policy_to_log:.4f}",
-                        tanh_log_policy=f"{tanh_log_policy_to_log:.4f}",
-                        # reinforce=f"{reinforce_to_log:.4f}",
-                        # advantage_prediction=f"{advantage_prediction_to_log:.4f}",
-                        # advantage=f"{advantage_to_log:.4f}",
-                        # value=f"{value_to_log:.4f}",
-                        # conv=f"{convergence_to_log:.4f}",
-                        # div=f"{divergence_to_log:.4f}",
-                        entropy=f"{entropy_to_log:.4f}",
-                        entropy_target=f"{entropy_target_to_log:.4f}",
-                        kl_div=f"{kl_div_to_log:.4f}",
-                        self_kl=f"{self_kl_to_log:.4f}",
-                        peer_kl=f"{peer_kl_to_log:.4f}",
-                        # ce=f"{ce_to_log:.4f}",
-                        # weighted_entropy=f"{weighted_entropy_to_log:.4f}",
-                        # weighted_kl_div=f"{weighted_kl_div_to_log:.4f}",
-                        # weighted_ce=f"{weighted_ce_to_log:.4f}",
+                        loss=loss_to_log,
                     )
 
                     # Log per-step metrics
@@ -1223,24 +1171,6 @@ class TuneRecipe(FTRecipeInterface):
                         log_dict = {
                             "loss": loss_to_log,
                             "lr": get_lr(self._optimizer or self._optim_ckpt_wrapper),
-                            "policy": policy_to_log,
-                            "unclipped_policy": unclipped_policy_to_log,
-                            "tanh_log_policy": tanh_log_policy_to_log,
-                            "reinforce": reinforce_to_log,
-                            "advantage_prediction": advantage_prediction_to_log,
-                            "advantage": advantage_to_log,
-                            "value": value_to_log,
-                            "convergence": convergence_to_log,
-                            "divergence": divergence_to_log,
-                            "entropy": entropy_to_log,
-                            "entropy_target": entropy_target_to_log,
-                            "kl_div": kl_div_to_log,
-                            "self_kl_div": self_kl_to_log,
-                            "peer_kl_div": peer_kl_to_log,
-                            "ce": ce_to_log,
-                            "weighted_entropy": weighted_entropy_to_log,
-                            "weighted_kl_div": weighted_kl_div_to_log,
-                            "weighted_ce": weighted_ce_to_log,
                             "tokens_per_second_per_gpu": running_result.num_tokens
                             / (time_per_step * world_size),
                         }
@@ -1257,7 +1187,7 @@ class TuneRecipe(FTRecipeInterface):
 
                     # Reset running stats for the next step
                     del running_result
-                    running_result = PPOResult().to(self._device)
+                    running_result = GRPOResult().to(self._device)
                     t0 = time.perf_counter()
 
                     # Stop tracking CUDA memory now that active steps are complete
