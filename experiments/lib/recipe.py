@@ -1037,8 +1037,24 @@ class TuneRecipe(FTRecipeInterface):
 
                 utils.batch_to_device(batch, self._device)  # type: ignore - `batch_to_device` expects a `dict`, not a `TypedDict`, but this should be fine
 
-                # Assuming the first token in the batch is the bos token
+                # Assume the first token in the batch is the bos token
                 bos_id = int(batch["tokens"].view(-1)[0].item())
+
+                # Create grouped causal mask
+                batch_size, seq_len = batch["tokens"].size()
+                causal_mask = (
+                    torch.tril(
+                        torch.ones(
+                            seq_len, seq_len, dtype=torch.bool, device=self._device
+                        )
+                    )
+                    .unsqueeze(0)
+                    .expand(batch_size, seq_len, seq_len)
+                )
+                group_mask = batch["group_ids"].unsqueeze(2) == batch[
+                    "group_ids"
+                ].unsqueeze(1)
+                mask = causal_mask & group_mask
 
                 if self.reference_model_state_dict:
                     # Save current weights and load reference weights
@@ -1048,7 +1064,7 @@ class TuneRecipe(FTRecipeInterface):
                     with torch.no_grad(), self.activations_handling_ctx:
                         hidden_states, logits = self._model(
                             tokens=batch["tokens"],
-                            mask=batch["mask"],
+                            mask=mask,
                             input_pos=batch["input_pos"],
                         )
                         del hidden_states
@@ -1083,10 +1099,10 @@ class TuneRecipe(FTRecipeInterface):
                 with self.activations_handling_ctx:
                     hidden_states, logits = self._model(
                         tokens=batch["tokens"],
-                        mask=batch["mask"],
+                        mask=mask,
                         input_pos=batch["input_pos"],
                     )
-                del batch["mask"], batch["input_pos"]  # type: ignore
+                del mask, batch["input_pos"]  # type: ignore
 
                 mlp_head_preds = self._value_head(hidden_states)
                 if self._loss_fn.advantage_prediction_coef == 0:

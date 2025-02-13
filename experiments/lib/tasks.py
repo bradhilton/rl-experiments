@@ -10,12 +10,7 @@ import sys
 from typing import Awaitable, Callable, TypeVar
 
 from .chat_completions import get_chat_completion
-
-try:
-    sys.modules["IPython"].get_ipython
-    from tqdm import notebook as tqdm
-except:
-    from tqdm import std as tqdm
+from .tqdm import tqdm
 
 Grader = Callable[[Choice], float | Awaitable[float]]
 
