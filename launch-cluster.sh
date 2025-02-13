@@ -2,14 +2,12 @@
 
 # Check for unstaged changes
 if ! git diff --quiet; then
-    echo "Error: You have unstaged changes. Please commit or stash them before launching the cluster."
-    exit 1
+    echo "Warning: You have unstaged changes. Unstaged changes will be discarded from the cluster working directory."
 fi
 
 # Check for uncommitted changes
 if ! git diff --cached --quiet; then
-    echo "Error: You have uncommitted changes. Please commit them before launching the cluster."
-    exit 1
+    echo "Warning: You have uncommitted changes. Uncommitted changes will be discarded from the cluster working directory."
 fi
 
 # Pull latest changes

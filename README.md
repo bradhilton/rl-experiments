@@ -53,7 +53,7 @@ To launch a cluster with the default configuration:
 This will:
 
 1. Load your environment variables from `.env`
-2. Launch a cluster named "openpipe-rl" using the configuration in `cluster.yaml`
+2. Launch a cluster named "openpipe" using the configuration in `cluster.yaml`
 3. Set up the development environment on the cluster
 
 Additional sky launch options can be passed to the script. For example, to launch a cluster with 2 A100 GPUs:
@@ -67,15 +67,15 @@ Additional sky launch options can be passed to the script. For example, to launc
 To SSH into your running cluster:
 
 ```bash
-ssh openpipe-rl
+ssh openpipe
 ```
 
 To use VSCode with the cluster:
 
 1. Press `Cmd/Ctrl + Shift + P`
 2. Type `Remote-SSH: Connect Current Window to Host`
-3. Select `openpipe-rl` from the list
-4. Open the `openpipe-rl` folder to access the repo
+3. Select `openpipe` from the list
+4. Open the `openpipe` folder to access the repo
 
 ### Other Useful Commands
 
@@ -88,16 +88,16 @@ To use VSCode with the cluster:
 - Stop your cluster (to pause billing):
 
   ```bash
-  sky stop openpipe-rl
+  sky stop openpipe
   ```
 
 - Start a stopped cluster:
 
   ```bash
-  sky start openpipe-rl
+  sky start openpipe
   ```
 
 - Terminate your cluster (to delete all resources):
   ```bash
-  sky down openpipe-rl
+  sky down openpipe
   ```
