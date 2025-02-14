@@ -26,6 +26,7 @@ from torchtune.training.metric_logging import MetricLoggerInterface
 from tqdm import tqdm
 from typing import (
     Any,
+    cast,
     Callable,
     Dict,
     Generic,
@@ -1089,10 +1090,11 @@ class TuneRecipe(FTRecipeInterface):
                                 dim=-1,
                             )
                         else:
-                            reference_logprobs = torch.distributions.Categorical(
-                                logits=logits
-                            ).log_prob(
-                                shift_tensor(batch["tokens"], ignore_label=bos_id)
+                            reference_logprobs = cast(
+                                torch.Tensor,
+                                torch.distributions.Categorical(logits=logits).log_prob(
+                                    shift_tensor(batch["tokens"], ignore_label=bos_id)
+                                ),
                             )
                         del logits
 
@@ -1119,6 +1121,8 @@ class TuneRecipe(FTRecipeInterface):
                     logits=logits,
                     tokens=batch["tokens"],
                     advantages=batch["advantages"],
+                    logprobs=batch["logprobs"],
+                    reference_logprobs=reference_logprobs,
                     mask=batch["assistant_mask"],
                     bos_id=bos_id,
                 )

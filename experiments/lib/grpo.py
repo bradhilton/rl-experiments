@@ -75,6 +75,8 @@ class GRPO(torch.nn.Module):
         logits: Union[torch.Tensor, list[torch.Tensor]],
         tokens: torch.Tensor,
         advantages: torch.Tensor,
+        logprobs: torch.Tensor,
+        reference_logprobs: torch.Tensor | None,
         mask: torch.Tensor,
         bos_id: int,
     ) -> GRPOResult:
@@ -92,6 +94,12 @@ class GRPO(torch.nn.Module):
             advantages (Tensor):
                 Shape: (batch_size, sequence_length)
                 Token advantages.
+            logprobs (Tensor):
+                Shape: (batch_size, sequence_length)
+                Token log probabilities.
+            reference_logprobs (Tensor | None):
+                Shape: (batch_size, sequence_length)
+                Reference token log probabilities.
             mask (Tensor):
                 Shape: (batch_size, sequence_length)
                 Mask specifying positions where loss should be computed.
@@ -108,18 +116,28 @@ class GRPO(torch.nn.Module):
                 logits,
                 tokens.chunk(num_chunks, dim=1),
                 advantages.chunk(num_chunks, dim=1),
+                logprobs.chunk(num_chunks, dim=1),
+                (
+                    reference_logprobs.chunk(num_chunks, dim=1)
+                    if reference_logprobs is not None
+                    else [None] * num_chunks
+                ),
                 mask.chunk(num_chunks, dim=1),
             ):
-                result += self._forward_chunk(*chunked_args, bos_id)
+                result += self._forward_chunk(*chunked_args, bos_id=bos_id)
             return result
 
-        return self._forward_chunk(logits, tokens, advantages, mask, bos_id)
+        return self._forward_chunk(
+            logits, tokens, advantages, logprobs, reference_logprobs, mask, bos_id
+        )
 
     def _forward_chunk(
         self,
         logits: torch.Tensor,
         tokens: torch.Tensor,
         advantages: torch.Tensor,
+        logprobs: torch.Tensor,
+        reference_logprobs: torch.Tensor | None,
         mask: torch.Tensor,
         bos_id: int,
     ) -> GRPOResult:
@@ -136,8 +154,12 @@ class GRPO(torch.nn.Module):
         )  # (batch_size * sequence_length,)
         mask = shift_tensor(mask, False).view(-1)  # (batch_size * sequence_length,)
         dist = torch.distributions.Categorical(logits=logits)
-        logprobs = dist.log_prob(tokens)[mask]
-        policy_loss = logprobs.mul(-advantages).sum()
+        new_logprobs = dist.log_prob(tokens)[mask]
+        logprobs = logprobs[mask]
+        logprobs = torch.where(torch.isnan(logprobs), new_logprobs, logprobs)
+        if reference_logprobs is not None:
+            reference_logprobs = reference_logprobs[mask]
+        policy_loss = new_logprobs.mul(-advantages[mask]).sum()
         return GRPOResult(
             num_tokens=mask.sum(),
             policy_loss=policy_loss,
