@@ -152,6 +152,9 @@ class GRPO(torch.nn.Module):
         advantages = shift_tensor(advantages, 0).view(
             -1
         )  # (batch_size * sequence_length,)
+        logprobs = shift_tensor(logprobs, 0).view(-1)  # (batch_size * sequence_length,)
+        if reference_logprobs is not None:
+            reference_logprobs = shift_tensor(reference_logprobs, 0).view(-1)
         mask = shift_tensor(mask, False).view(-1)  # (batch_size * sequence_length,)
         dist = torch.distributions.Categorical(logits=logits)
         new_logprobs = dist.log_prob(tokens)[mask]

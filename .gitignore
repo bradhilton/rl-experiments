@@ -4,4 +4,5 @@ __pycache__/
 .venv
 experiments/data/chat-completion-logs/
 experiments/data/chat-completions/
+experiments/logs/
 experiments/models/

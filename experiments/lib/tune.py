@@ -6,12 +6,13 @@ from lib.recipe import ComponentConfig, recipe_main, TuneRecipeConfig
 from omegaconf import OmegaConf
 import os
 import re
+import shutil
 import sys
 from torchtune.modules import TransformerDecoder
 from torchtune.training import cleanup_before_training, FullModelHFCheckpointer
 from torchtune.training.metric_logging import DiskLogger
 import tqdm
-from typing import Any, Literal, IO
+from typing import Any, Callable, Literal, IO
 
 
 Verbosity = Literal[0, 1, 2]
@@ -21,26 +22,29 @@ async def tune(
     base_model: str,
     output_dir: str,
     packed_tensors: PackedTensors,
-    model: TransformerDecoder,
+    model: Callable[[], TransformerDecoder],
     model_type: str,
     config: TuneRecipeConfig = TuneRecipeConfig(),
     in_process: bool = False,
     verbosity: Verbosity = 2,
-) -> None:
-    process = await asyncio.create_subprocess_shell(
-        f"HF_HUB_ENABLE_HF_TRANSFER=1 huggingface-cli download {base_model}",
-        stdout=asyncio.subprocess.PIPE,
-        stderr=asyncio.subprocess.PIPE,
-    )
-    stdout, _ = await process.communicate()
-    base_checkpoint_dir = stdout.decode().strip()
+) -> str:
+    if os.path.isdir(base_model):
+        base_checkpoint_dir = base_model
+    else:
+        process = await asyncio.create_subprocess_shell(
+            f"HF_HUB_ENABLE_HF_TRANSFER=1 huggingface-cli download {base_model}",
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+        stdout, _ = await process.communicate()
+        base_checkpoint_dir = stdout.decode().strip()
 
-    config.checkpointer = get_checkpointer_config(
+    config.checkpointer = _get_checkpointer_config(
         checkpoint_dir=base_checkpoint_dir,
         output_dir=output_dir,
         tune_model_type=model_type,
     )
-    config.reference_checkpointer = get_checkpointer_config(
+    config.reference_checkpointer = _get_checkpointer_config(
         checkpoint_dir=base_checkpoint_dir,
         output_dir=output_dir,
         tune_model_type=model_type,
@@ -54,21 +58,21 @@ async def tune(
     )
     config.seed = 42
     dict_config = config.dict_config()
-    print(OmegaConf.to_yaml(dict_config))
     OmegaConf.save(dict_config, f"{output_dir}/config.yaml")
     if in_process:
         cleanup_before_training()
         recipe_main(config)
     else:
-        await tune_run(
+        await _tune_run(
             config_path=f"{output_dir}/config.yaml",
             total=disk_packed_tensors["num_sequences"],
             verbosity=verbosity,
             tune_run_env={"CUDA_LAUNCH_BLOCKING": "1"},
         )
+    return _save_last_checkpoint_files(base_checkpoint_dir, output_dir)
 
 
-def get_checkpointer_config(
+def _get_checkpointer_config(
     checkpoint_dir: str,
     output_dir: str,
     tune_model_type: str,
@@ -92,7 +96,7 @@ def get_checkpointer_config(
     )
 
 
-async def tune_run(
+async def _tune_run(
     config_path: str,
     total: int,
     verbosity: Verbosity = 2,
@@ -172,3 +176,87 @@ async def tune_run(
         process.kill()
     if pbar:
         pbar.close()
+
+
+def _save_last_checkpoint_files(base_checkpoint_dir: str, output_dir: str) -> str:
+    """
+    Saves and returns the directory of the latest checkpoint.
+    """
+    # Find the latest epoch number from model checkpoint files
+    epoch = max(
+        (
+            int(result.group(1))
+            for result in (
+                re.search(r"hf_model_\d+_(\d+)\.pt", file)
+                for file in glob.glob(f"{output_dir}/hf_model_*_*.pt")
+            )
+            if result
+        ),
+        default=None,
+    )
+
+    assert (
+        epoch is not None
+    ), f"No model checkpoint files found to save in output directory {output_dir}"
+
+    iteration, iteration_dir = _create_iteration_dir(base_checkpoint_dir, output_dir)
+
+    # Move model checkpoint files to the iteration directory
+    for src in [
+        path
+        for extension in ("pt", "pt.ignore")
+        for path in glob.glob(f"{output_dir}/*_{epoch}.{extension}")
+    ]:
+        dst = f"{iteration_dir}/{os.path.basename(src).replace(f'_{epoch}.pt', '.pt')}"
+        shutil.move(src, dst)
+
+    # Delete all checkpoint files in the output directory
+    for file in [
+        path
+        for extension in ("pt", "pt.ignore")
+        for path in glob.glob(f"{output_dir}/*_*.{extension}")
+    ]:
+        os.remove(file)
+
+    print(f"Saved iteration {iteration} model files to {iteration_dir}")
+    return iteration_dir
+
+
+def _create_iteration_dir(
+    base_checkpoint_dir: str, output_dir: str, copy_model_files: bool = False
+) -> tuple[int, str]:
+    # Find the next iteration number by looking at existing subdirectories
+    iteration = (
+        max(
+            (
+                int(subdir)
+                for subdir in os.listdir(output_dir)
+                if os.path.isdir(os.path.join(output_dir, subdir)) and subdir.isdigit()
+            ),
+            default=0,
+        )
+        + 1
+    )
+
+    # Create a new directory for this iteration
+    iteration_dir = f"{output_dir}/{iteration:04d}"
+    os.makedirs(iteration_dir, exist_ok=True)
+
+    # Copy configuration files (non-model files) to the iteration directory
+    for file in os.listdir(base_checkpoint_dir):
+        if not any(
+            file.endswith(suffix)
+            for suffix in (
+                ()
+                if copy_model_files
+                else (".safetensors", ".pt", ".ckpt", ".bin", ".pth", ".h5")
+            )
+        ):
+            src = os.path.join(base_checkpoint_dir, file)
+            dst = os.path.join(iteration_dir, file)
+            if os.path.isdir(src):
+                shutil.copytree(src, dst)
+            else:
+                shutil.copy2(src, dst)
+
+    return iteration, iteration_dir

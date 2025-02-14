@@ -46,7 +46,7 @@ async def get_task_results(
             on_chunk=lambda chunk, _: stats.update(id=chunk.id, chunk=chunk),
             messages=task.messages,
             model=model,
-            max_tokens=2**17,
+            max_tokens=2**16,
             logprobs=True,
             top_logprobs=5,
         )
