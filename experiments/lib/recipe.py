@@ -1118,6 +1118,7 @@ class TuneRecipe(FTRecipeInterface):
                 current_result = self._loss_fn.forward(
                     logits=logits,
                     tokens=batch["tokens"],
+                    advantages=batch["advantages"],
                     mask=batch["assistant_mask"],
                     bos_id=bos_id,
                 )

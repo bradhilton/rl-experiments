@@ -73,7 +73,7 @@ def packed_tensors_from_tokenized_results(
             assert len(assistant_indices) == len(result.token_logprobs)
             for idx, token_logprob in zip(assistant_indices, result.token_logprobs):
                 logprobs[-1][idx + offset] = token_logprob.logprob
-        advantages[-1].extend([0.0] * len(result.token_ids))
+        advantages[-1].extend([1.0] * len(result.token_ids))
 
     def pad(values: list[list], pad_value) -> list[list]:
         max_len = seq_len

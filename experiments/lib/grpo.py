@@ -40,7 +40,7 @@ def shift_tensor(
 @dataclass
 class GRPOResult:
     num_tokens: torch.Tensor = field(default_factory=lambda: torch.tensor(0))
-    ce_loss: torch.Tensor = field(default_factory=lambda: torch.tensor(0.0))
+    policy_loss: torch.Tensor = field(default_factory=lambda: torch.tensor(0.0))
 
     def named_tensors(self) -> Iterable[tuple[str, torch.Tensor]]:
         for field in fields(self):
@@ -66,7 +66,7 @@ class GRPOResult:
 
     @property
     def total_loss(self) -> torch.Tensor:
-        return self.ce_loss
+        return self.policy_loss
 
 
 class GRPO(torch.nn.Module):
@@ -74,6 +74,7 @@ class GRPO(torch.nn.Module):
         self,
         logits: Union[torch.Tensor, list[torch.Tensor]],
         tokens: torch.Tensor,
+        advantages: torch.Tensor,
         mask: torch.Tensor,
         bos_id: int,
     ) -> GRPOResult:
@@ -88,6 +89,9 @@ class GRPO(torch.nn.Module):
             tokens (Tensor):
                 Shape: (batch_size, sequence_length)
                 Token indices.
+            advantages (Tensor):
+                Shape: (batch_size, sequence_length)
+                Token advantages.
             mask (Tensor):
                 Shape: (batch_size, sequence_length)
                 Mask specifying positions where loss should be computed.
@@ -103,17 +107,19 @@ class GRPO(torch.nn.Module):
             for chunked_args in zip(
                 logits,
                 tokens.chunk(num_chunks, dim=1),
+                advantages.chunk(num_chunks, dim=1),
                 mask.chunk(num_chunks, dim=1),
             ):
                 result += self._forward_chunk(*chunked_args, bos_id)
             return result
 
-        return self._forward_chunk(logits, tokens, mask, bos_id)
+        return self._forward_chunk(logits, tokens, advantages, mask, bos_id)
 
     def _forward_chunk(
         self,
         logits: torch.Tensor,
         tokens: torch.Tensor,
+        advantages: torch.Tensor,
         mask: torch.Tensor,
         bos_id: int,
     ) -> GRPOResult:
@@ -125,11 +131,14 @@ class GRPO(torch.nn.Module):
         tokens = shift_tensor(tokens, bos_id).view(
             -1
         )  # (batch_size * sequence_length,)
+        advantages = shift_tensor(advantages, 0).view(
+            -1
+        )  # (batch_size * sequence_length,)
         mask = shift_tensor(mask, False).view(-1)  # (batch_size * sequence_length,)
         dist = torch.distributions.Categorical(logits=logits)
         logprobs = dist.log_prob(tokens)[mask]
-        ce_loss = -logprobs.sum()
+        policy_loss = logprobs.mul(-advantages).sum()
         return GRPOResult(
             num_tokens=mask.sum(),
-            ce_loss=ce_loss,
+            policy_loss=policy_loss,
         )
