@@ -8,6 +8,7 @@ import os
 import re
 import shutil
 import sys
+import torch
 from torchtune.modules import TransformerDecoder
 from torchtune.training import cleanup_before_training, FullModelHFCheckpointer
 from torchtune.training.metric_logging import DiskLogger
@@ -67,6 +68,7 @@ async def tune(
             config_path=f"{output_dir}/config.yaml",
             total=disk_packed_tensors["num_sequences"],
             verbosity=verbosity,
+            torchrun_kwargs={"nproc_per_node": torch.cuda.device_count()},
             tune_run_env={"CUDA_LAUNCH_BLOCKING": "1"},
         )
     return _save_last_checkpoint_files(base_checkpoint_dir, output_dir)
