@@ -49,18 +49,19 @@ async def get_task_results(
     log_token_logprobs: bool = True,
     n: int = 1,
     params: ChatCompletionParams | None = None,
+    pbar_desc: str | None = None,
+    prices: tuple[float, float] | None = None,
     transform: Callable[[TaskResult], T | Awaitable[T]] = lambda x: x,
 ) -> list[T]:
-    pbar = tqdm.tqdm(total=len(tasks) * n)
-    stats = TaskResultStats(pbar=pbar)
+    pbar = tqdm.tqdm(total=len(tasks) * n, desc=pbar_desc)
+    stats = TaskResultStats(pbar=pbar, prices=prices)
 
     async def get_task_result(
         task: Task, client: AsyncOpenAI, model: str, log_results: bool
     ) -> T:
-        nonlocal params
-        params = params or {}
-        if "logprobs" not in params:
-            params["logprobs"] = True
+        _params = (params or {}).copy()
+        if "logprobs" not in _params:
+            _params["logprobs"] = True
         chat_completions: list[ChatCompletion] = []
         rewards: dict[tuple[str, int], float] = {}
         exceptions: list[Exception] = []
@@ -76,7 +77,7 @@ async def get_task_results(
                 ),
                 messages=task.messages,
                 model=model,
-                **params,  # type: ignore
+                **_params,  # type: ignore
             )
             for _ in range(n)
         ):
@@ -103,12 +104,15 @@ async def get_task_results(
                 exceptions.append(e)
                 stats.update(id=None, exception=e)
                 continue
-        reward_mean = np.mean(list(rewards.values()))
-        reward_std = np.std(list(rewards.values()))
-        advantages = {
-            key: float((reward - reward_mean) / (reward_std + 1e-6))
-            for key, reward in rewards.items()
-        }
+        if rewards:
+            reward_mean = np.mean(list(rewards.values()))
+            reward_std = np.std(list(rewards.values()))
+            advantages = {
+                key: float((reward - reward_mean) / (reward_std + 1e-6))
+                for key, reward in rewards.items()
+            }
+        else:
+            advantages = {key: 0.0 for key in rewards.keys()}
         return await maybe_await(
             transform(
                 TaskResult(
@@ -141,6 +145,7 @@ async def get_task_results(
 @dataclass
 class TaskResultStats:
     pbar: tqdm.tqdm
+    prices: tuple[float, float] | None
     completion_tokens: int = 0
     exceptions: int = 0
     grades: int = 0
@@ -151,6 +156,9 @@ class TaskResultStats:
     token_logprobs: int = 0
     total_reward: float = 0
     usages: int = 0
+
+    def __del__(self) -> None:
+        self.pbar.close()
 
     def update(
         self,
@@ -187,6 +195,13 @@ class TaskResultStats:
             "prompt_tokens": self.prompt_tokens / max(self.usages, 1),
             "reward": self.total_reward / max(self.grades, 1),
         }
+        if self.prices:
+            postfix["spend"] = (
+                f"${(
+                self.new_prompt_tokens * self.prices[0]
+                + (self.token_logprobs or self.new_completion_tokens) * self.prices[1]
+            ) / 1_000_000:.2f}"
+            )
         if self.token_logprobs:
             postfix["token_logprobs"] = self.token_logprobs
         if self.exceptions:

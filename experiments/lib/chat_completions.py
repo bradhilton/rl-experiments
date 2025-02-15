@@ -85,14 +85,15 @@ async def get_chat_completion(
         ):
             json_data = bytes(await result.bytes_async())
             chat_completion = ChatCompletion.model_validate_json(json_data)
-            for store, result in zip(stores, results):
-                if isinstance(result, FileNotFoundError):
-                    await obstore.put_async(
-                        store,
-                        f"chat-completions/{cache_key}.json",
-                        json_data,
-                    )
-            return chat_completion
+            if is_valid_chat_completion(chat_completion):
+                for store, result in zip(stores, results):
+                    if isinstance(result, FileNotFoundError):
+                        await obstore.put_async(
+                            store,
+                            f"chat-completions/{cache_key}.json",
+                            json_data,
+                        )
+                return chat_completion
     if log_results or on_chunk:
         stream = await client.chat.completions.create(**create_params, stream=True)
         log_file = os.path.join(
@@ -136,3 +137,13 @@ async def get_chat_completion(
         with open("./data/chat-completion-requests.jsonl", "a") as f:
             f.write(json.dumps(request, sort_keys=True) + "\n")
     return chat_completion
+
+
+def is_valid_chat_completion(chat_completion: ChatCompletion) -> bool:
+    return bool(
+        chat_completion.choices
+        and all(
+            choice.message.content or choice.message.refusal
+            for choice in chat_completion.choices
+        )
+    )
