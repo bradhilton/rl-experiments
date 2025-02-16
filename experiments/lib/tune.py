@@ -37,8 +37,25 @@ async def tune(
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
         )
-        stdout, _ = await process.communicate()
-        base_checkpoint_dir = stdout.decode().strip()
+
+        base_stdout = []
+
+        async def read_stream(stream, is_stderr=False):
+            while True:
+                line = await stream.readline()
+                if not line:
+                    break
+                text = line.decode().rstrip()
+                print(text)
+                if not is_stderr:
+                    base_stdout.append(text)
+
+        await asyncio.gather(
+            read_stream(process.stdout, is_stderr=False),
+            read_stream(process.stderr, is_stderr=True),
+        )
+        await process.wait()
+        base_checkpoint_dir = "\n".join(base_stdout).strip()
 
     config.checkpointer = _get_checkpointer_config(
         checkpoint_dir=base_checkpoint_dir,

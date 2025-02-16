@@ -27,6 +27,7 @@ qwen_7b = Model(
     tune_max_batch_tokens={
         1: 32768,
         2: 49152,
+        4: 49152,
     }[device_count],
     tune_optimizer=(
         ComponentConfig(
