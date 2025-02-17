@@ -51,9 +51,11 @@ async def get_task_results(
     params: ChatCompletionParams | None = None,
     pbar_desc: str | None = None,
     prices: tuple[float, float] | None = None,
+    semaphore: asyncio.Semaphore | None = None,
     transform: Callable[[TaskResult], T | Awaitable[T]] = lambda x: x,
 ) -> list[T]:
-    pbar = tqdm.tqdm(total=len(tasks) * n, desc=pbar_desc)
+    num_completions = len(tasks) * n
+    pbar = tqdm.tqdm(total=num_completions, desc=pbar_desc)
     stats = TaskResultStats(pbar=pbar, prices=prices)
 
     async def get_task_result(
@@ -69,17 +71,18 @@ async def get_task_results(
             get_chat_completion(
                 client,
                 cache=cache,
-                log_results=log_results,
+                log_results=log_results and i == 0,
                 on_chunk=(
                     (lambda chunk, _: stats.update(id=chunk.id, chunk=chunk))
                     if log_token_logprobs
                     else None
                 ),
+                semaphore=semaphore,
                 messages=task.messages,
                 model=model,
                 **_params,  # type: ignore
             )
-            for _ in range(n)
+            for i in range(n)
         ):
             try:
                 chat_completion = await chat_completion_future

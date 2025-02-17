@@ -61,6 +61,7 @@ async def get_chat_completion(
     cache: bool = True,
     log_results: bool = True,
     on_chunk: Callable[[ChatCompletionChunk, ChatCompletion], None] | None = None,
+    semaphore: asyncio.Semaphore | None = None,
     **create_params: Unpack[CreateParams],
 ) -> ChatCompletion:
     request = ChatCompletionRequest(
@@ -94,38 +95,41 @@ async def get_chat_completion(
                             json_data,
                         )
                 return chat_completion
-    if log_results or on_chunk:
-        stream = await client.chat.completions.create(**create_params, stream=True)
-        log_file = os.path.join(
-            chat_completion_logs_dir, f"{datetime.now().isoformat()}.log"
-        )
-        if log_results:
-            with open(log_file, "w") as f:
-                f.write(
-                    "".join(
-                        f"{message['role'].capitalize()}:\n{message.get('content', '')}\n\n"
-                        for message in create_params["messages"]
+    async with semaphore or asyncio.Semaphore():
+        if log_results or on_chunk:
+            stream = await client.chat.completions.create(**create_params, stream=True)
+            log_file = os.path.join(
+                chat_completion_logs_dir, f"{datetime.now().isoformat()}.log"
+            )
+            if log_results:
+                with open(log_file, "w") as f:
+                    f.write(
+                        "".join(
+                            f"{message['role'].capitalize()}:\n{message.get('content', '')}\n\n"
+                            for message in create_params["messages"]
+                        )
+                        + "Assistant:\n"
                     )
-                    + "Assistant:\n"
-                )
 
-        def _on_chunk(chunk: ChatCompletionChunk, completion: ChatCompletion) -> None:
-            if on_chunk:
-                on_chunk(chunk, completion)
-            if log_results and chunk.choices:
-                try:
-                    with timeout():
-                        with open(log_file, "a") as f:
-                            f.write(chunk.choices[0].delta.content or "")
-                except TimeoutError:
-                    pass  # Skip writing this chunk if it times out
+            def _on_chunk(
+                chunk: ChatCompletionChunk, completion: ChatCompletion
+            ) -> None:
+                if on_chunk:
+                    on_chunk(chunk, completion)
+                if log_results and chunk.choices:
+                    try:
+                        with timeout():
+                            with open(log_file, "a") as f:
+                                f.write(chunk.choices[0].delta.content or "")
+                    except TimeoutError:
+                        pass  # Skip writing this chunk if it times out
 
-        chat_completion = await consume_chat_completion_stream(
-            stream,
-            on_chunk=_on_chunk,
-        )
-    else:
-        chat_completion = await client.chat.completions.create(**create_params)
+            chat_completion = await consume_chat_completion_stream(
+                stream,
+                on_chunk=_on_chunk,
+            )
+        else:
+            chat_completion = await client.chat.completions.create(**create_params)
     if cache:
         json_data = chat_completion.model_dump_json().encode()
         for store in stores:
