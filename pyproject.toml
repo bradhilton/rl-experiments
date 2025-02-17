@@ -6,7 +6,7 @@ readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
     "aioitertools>=0.12.0",
-    "bitsandbytes>=0.45.2",
+    # "bitsandbytes>=0.45.2",
     "black>=25.1.0",
     "cudo-compute==0.1.10",
     "hf-transfer>=0.1.9",
@@ -15,7 +15,7 @@ dependencies = [
     "openai>=1.61.1",
     "polars>=1.22.0",
     "seaborn>=0.13.2",
-    "skypilot[cudo,do,gcp,lambda,runpod]>=0.8.0",
+    "skypilot[cudo,do,gcp,lambda,runpod]",
     "torch>=2.5.1",
     "torchao>=0.8.0",
     "torchtune",
@@ -31,3 +31,4 @@ dev-dependencies = [
 
 [tool.uv.sources]
 torchtune = { git = "https://github.com/pytorch/torchtune", rev = "4b6877a6ef31a1f987c27594eaf8fe467b5ab785" }
+skypilot = { git = "https://github.com/skypilot-org/skypilot", rev = "9d8d7c6f6bc5482bd10c4c0f548786012c0a9b18" }
