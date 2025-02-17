@@ -18,6 +18,7 @@ class Model:
     tune_max_batch_tokens: int
     tune_optimizer: ComponentConfig
     vllm_named_arguments: dict[str, Any]
+    tune_fsdp_cpu_offload: bool = False
 
 
 qwen_7b = Model(
