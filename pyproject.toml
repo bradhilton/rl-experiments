@@ -30,5 +30,5 @@ dev-dependencies = [
 ]
 
 [tool.uv.sources]
-torchtune = { git = "https://github.com/pytorch/torchtune", rev = "4b6877a6ef31a1f987c27594eaf8fe467b5ab785" }
 skypilot = { git = "https://github.com/skypilot-org/skypilot", rev = "9d8d7c6f6bc5482bd10c4c0f548786012c0a9b18" }
+torchtune = { git = "https://github.com/pytorch/torchtune", rev = "4b6877a6ef31a1f987c27594eaf8fe467b5ab785" }
