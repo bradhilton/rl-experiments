@@ -4,6 +4,7 @@ import httpx
 from openai import AsyncOpenAI, DefaultAsyncHttpxClient
 import os
 import socket
+import subprocess
 import sys
 import re
 from typing import Any, IO, Optional
@@ -15,6 +16,10 @@ class vLLM:
     max_concurrent_tokens: int
     process: asyncio.subprocess.Process
 
+    def __del__(self) -> None:
+        self.process.terminate()
+        kill_vllm_workers()
+
 
 async def start_vllm(
     model: str,
@@ -25,6 +30,7 @@ async def start_vllm(
     timeout: float = 120.0,
     verbosity: int = 2,
 ) -> vLLM:
+    kill_vllm_workers()
     if os.path.exists(os.path.abspath(model)):
         named_arguments.setdefault("served_model_name", model)
         model = os.path.abspath(model)
@@ -64,7 +70,7 @@ async def start_vllm(
     if verbosity > 0:
         print(f"$ {' '.join(args)}")
     os.makedirs(os.path.dirname(log_file), exist_ok=True)
-    log = open(log_file, "a")
+    log = open(log_file, "w")
     logging = verbosity > 1
     max_concurrent_tokens: Optional[int] = None
 
@@ -119,6 +125,7 @@ async def start_vllm(
         except Exception:
             if asyncio.get_event_loop().time() - start > timeout:
                 process.terminate()
+                kill_vllm_workers()
                 raise TimeoutError("vLLM server did not start in time")
             continue
     if logging:
@@ -126,7 +133,20 @@ async def start_vllm(
         logging = False
     if max_concurrent_tokens is None:
         process.terminate()
+        kill_vllm_workers()
         raise RuntimeError(
             "Max concurrent requests for the maximum model length not logged"
         )
     return vLLM(client, max_concurrent_tokens, process)
+
+
+def kill_vllm_workers() -> None:
+    result = subprocess.run(["ps", "aux"], capture_output=True, text=True)
+    pids = [
+        line.split()[1]
+        for line in result.stdout.splitlines()
+        if "from multiprocessing.spawn import spawn_main; spawn_main(tracker_fd="
+        in line
+    ]
+    for pid in pids:
+        subprocess.run(["sudo", "kill", "-9", pid], check=True)
