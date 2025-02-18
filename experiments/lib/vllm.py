@@ -53,7 +53,7 @@ async def start_vllm(
         "serve",
         model,
         *[
-            f"--{key.replace('_', '-')}{f'={value}' if value != True else ''}"
+            f"--{key.replace('_', '-')}{f'={value}' if value is not True else ''}"
             for key, value in named_arguments.items()
         ],
         "--api-key=default",

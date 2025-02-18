@@ -88,7 +88,7 @@ class TaskResultTokenizer:
             and choice.logprobs.content[0].token.startswith("token_id:")
         ):
             start = tokenized_result["assistant_masks"].index(1)
-            end = tokenized_result["assistant_masks"][start:].index(0)
+            end = start + tokenized_result["assistant_masks"][start:].index(0)
             tokenized_result["input_ids"][start:end] = [
                 int(token_logprob.token.split(":")[1])
                 for token_logprob in choice.logprobs.content
