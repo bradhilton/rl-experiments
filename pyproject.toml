@@ -9,6 +9,7 @@ dependencies = [
     # "bitsandbytes>=0.45.2",
     "black>=25.1.0",
     "cudo-compute==0.1.10",
+    "datasets==3.3.0",
     "hf-transfer>=0.1.9",
     "matplotlib>=3.10.0",
     "obstore>=0.4.0",

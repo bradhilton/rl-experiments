@@ -708,7 +708,7 @@ wheels = [
 
 [[package]]
 name = "datasets"
-version = "3.3.1"
+version = "3.3.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "aiohttp" },
@@ -726,9 +726,9 @@ dependencies = [
     { name = "tqdm" },
     { name = "xxhash" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/b3/f7/635b6ecdf27d2b0d25421656ce08d096841f7e338cc0b24a13a04ebe76bf/datasets-3.3.1.tar.gz", hash = "sha256:7dfb7bb345513bce194cf612cebd6f78e46f7d981342b89364b5ab813c7049a9", size = 563838 }
+sdist = { url = "https://files.pythonhosted.org/packages/a2/e5/1af665c7ddd2b5dc5e913baa93d0857c7722fd302d01cf2892d2e18cd7f9/datasets-3.3.0.tar.gz", hash = "sha256:54c607b06f6eaa1572e21e200d2870d89d50e3bcc622dc2021a53a6ce4f684c2", size = 563769 }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/30/b7/2622230d4b3540f9c7907664daf9ae6319519f36731a1a39f5ad541efff2/datasets-3.3.1-py3-none-any.whl", hash = "sha256:85182cbfa18faed0fb9dfc202f2668f1fed130fb88f8b3651b3cd8c4b3e61b1b", size = 484932 },
+    { url = "https://files.pythonhosted.org/packages/eb/9a/5448306807367232a7209fb6881890244b374c87d74e1e229abcb133e115/datasets-3.3.0-py3-none-any.whl", hash = "sha256:22312d09626f8fc3aa0a237b0c164997f5903bddd4c4c9e27dbaf563754c681b", size = 484866 },
 ]
 
 [[package]]
@@ -2230,6 +2230,7 @@ dependencies = [
     { name = "aioitertools" },
     { name = "black" },
     { name = "cudo-compute" },
+    { name = "datasets" },
     { name = "hf-transfer" },
     { name = "matplotlib" },
     { name = "obstore" },
@@ -2255,6 +2256,7 @@ requires-dist = [
     { name = "aioitertools", specifier = ">=0.12.0" },
     { name = "black", specifier = ">=25.1.0" },
     { name = "cudo-compute", specifier = "==0.1.10" },
+    { name = "datasets", specifier = "==3.3.0" },
     { name = "hf-transfer", specifier = ">=0.1.9" },
     { name = "matplotlib", specifier = ">=3.10.0" },
     { name = "obstore", specifier = ">=0.4.0" },
