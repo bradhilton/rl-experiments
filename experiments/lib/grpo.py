@@ -41,6 +41,8 @@ def shift_tensor(
 class GRPOResult:
     num_tokens: torch.Tensor = field(default_factory=lambda: torch.tensor(0))
     policy_loss: torch.Tensor = field(default_factory=lambda: torch.tensor(0.0))
+    entropy: torch.Tensor = field(default_factory=lambda: torch.tensor(0.0))
+    kl_div: torch.Tensor = field(default_factory=lambda: torch.tensor(0.0))
 
     def named_tensors(self) -> Iterable[tuple[str, torch.Tensor]]:
         for field in fields(self):
@@ -157,13 +159,26 @@ class GRPO(torch.nn.Module):
             reference_logprobs = shift_tensor(reference_logprobs, 0).view(-1)
         mask = shift_tensor(mask, False).view(-1)  # (batch_size * sequence_length,)
         dist = torch.distributions.Categorical(logits=logits)
+        entropy = dist.entropy()[mask]
         new_logprobs = dist.log_prob(tokens)[mask]
         logprobs = logprobs[mask]
         logprobs = torch.where(torch.isnan(logprobs), new_logprobs, logprobs)
         if reference_logprobs is not None:
             reference_logprobs = reference_logprobs[mask]
-        policy_loss = new_logprobs.mul(-advantages[mask]).sum()
+        advantages = advantages[mask]
+        policy_loss = new_logprobs.mul(-advantages)
+        if reference_logprobs is not None:
+            kl_div = torch.nn.functional.kl_div(
+                new_logprobs,
+                reference_logprobs,
+                reduction="none",
+                log_target=True,
+            )
+        else:
+            kl_div = torch.tensor(torch.nan, device=logits.device)
         return GRPOResult(
             num_tokens=mask.sum(),
-            policy_loss=policy_loss,
+            policy_loss=policy_loss.sum(),
+            entropy=entropy.sum(),
+            kl_div=kl_div.sum(),
         )

@@ -14,6 +14,7 @@ from typing import Any, IO, Optional
 class vLLM:
     client: AsyncOpenAI
     max_concurrent_tokens: int
+    model: str
     process: asyncio.subprocess.Process
 
     def __del__(self) -> None:
@@ -137,7 +138,12 @@ async def start_vllm(
         raise RuntimeError(
             "Max concurrent requests for the maximum model length not logged"
         )
-    return vLLM(client, max_concurrent_tokens, process)
+    return vLLM(
+        client,
+        max_concurrent_tokens,
+        named_arguments.get("served_model_name", model),
+        process,
+    )
 
 
 def kill_vllm_workers() -> None:
