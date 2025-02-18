@@ -3,6 +3,7 @@ import glob
 from lib.mlp_head_checkpointer import MLPHeadCheckpointer
 from lib.pack import PackedDataset, PackedTensors, packed_tensors_to_dir
 from lib.recipe import ComponentConfig, recipe_main, TuneRecipeConfig
+from lib.utils import setup_shm_symlink
 from omegaconf import OmegaConf
 import os
 import re
@@ -46,8 +47,9 @@ async def tune(
                 if not line:
                     break
                 text = line.decode().rstrip()
-                print(text)
-                if not is_stderr:
+                if is_stderr:
+                    print(text)
+                else:
                     base_stdout.append(text)
 
         await asyncio.gather(
@@ -56,6 +58,9 @@ async def tune(
         )
         await process.wait()
         base_checkpoint_dir = "\n".join(base_stdout).strip()
+
+    # Setup a symlink to /dev/shm for the output directory if present
+    setup_shm_symlink(output_dir)
 
     config.checkpointer = _get_checkpointer_config(
         checkpoint_dir=base_checkpoint_dir,
