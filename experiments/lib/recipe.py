@@ -1179,6 +1179,9 @@ class TuneRecipe(FTRecipeInterface):
 
                     per_token_result = running_result.per_token()
                     loss_to_log = per_token_result.total_loss.item()
+                    policy_loss_to_log = per_token_result.policy_loss.item()
+                    entropy_to_log = per_token_result.entropy.item()
+                    kl_div_to_log = per_token_result.kl_div.item()
                     pbar.update(1)
                     pbar.set_description(
                         f"{curr_epoch + 1}|{self.global_step}|Loss: {loss_to_log:.4f}"
@@ -1186,6 +1189,9 @@ class TuneRecipe(FTRecipeInterface):
                     pbar.set_postfix(
                         lr=get_lr(self._optimizer or self._optim_ckpt_wrapper),
                         loss=loss_to_log,
+                        policy=policy_loss_to_log,
+                        entropy=entropy_to_log,
+                        kl_div=kl_div_to_log,
                     )
 
                     # Log per-step metrics
@@ -1196,6 +1202,9 @@ class TuneRecipe(FTRecipeInterface):
                         time_per_step = time.perf_counter() - t0
                         log_dict = {
                             "loss": loss_to_log,
+                            "policy": policy_loss_to_log,
+                            "entropy": entropy_to_log,
+                            "kl_div": kl_div_to_log,
                             "lr": get_lr(self._optimizer or self._optim_ckpt_wrapper),
                             "tokens_per_second_per_gpu": running_result.num_tokens
                             / (time_per_step * world_size),

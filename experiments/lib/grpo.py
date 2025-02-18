@@ -43,6 +43,8 @@ class GRPOResult:
     policy_loss: torch.Tensor = field(default_factory=lambda: torch.tensor(0.0))
     entropy: torch.Tensor = field(default_factory=lambda: torch.tensor(0.0))
     kl_div: torch.Tensor = field(default_factory=lambda: torch.tensor(0.0))
+    entropy_weight: torch.Tensor = field(default_factory=lambda: torch.tensor(0.0))
+    kl_weight: torch.Tensor = field(default_factory=lambda: torch.tensor(0.0))
 
     def named_tensors(self) -> Iterable[tuple[str, torch.Tensor]]:
         for field in fields(self):
@@ -68,10 +70,33 @@ class GRPOResult:
 
     @property
     def total_loss(self) -> torch.Tensor:
-        return self.policy_loss
+        return (
+            self.policy_loss
+            - self.entropy * self.entropy_weight / self.num_tokens
+            + torch.nan_to_num(self.kl_div, 0.0) * self.kl_weight / self.num_tokens
+        )
 
 
 class GRPO(torch.nn.Module):
+    def __init__(
+        self,
+        clip_epsilon: float = 0.2,
+        entropy_coef: float = 0.0,
+        kl_coef: float = 0.0,
+    ) -> None:
+        """
+        Initialize the GRPO loss.
+
+        Args:
+            clip_epsilon (float): The epsilon value for clipping the policy ratio.
+            entropy_coef (float): The coefficient for the entropy bonus.
+            kl_coef (float): The coefficient for the KL divergence penalty.
+        """
+        super().__init__()
+        self.clip_epsilon = clip_epsilon
+        self.entropy_coef = entropy_coef
+        self.kl_coef = kl_coef
+
     def forward(
         self,
         logits: Union[torch.Tensor, list[torch.Tensor]],
@@ -104,7 +129,7 @@ class GRPO(torch.nn.Module):
                 Reference token log probabilities.
             mask (Tensor):
                 Shape: (batch_size, sequence_length)
-                Mask specifying positions where loss should be computed.
+                Boolean mask specifying positions where loss should be computed.
             bos_id (int):
                 Index of the beginning of sequence token in the vocabulary.
 
@@ -158,6 +183,7 @@ class GRPO(torch.nn.Module):
         if reference_logprobs is not None:
             reference_logprobs = shift_tensor(reference_logprobs, 0).view(-1)
         mask = shift_tensor(mask, False).view(-1)  # (batch_size * sequence_length,)
+        num_tokens = mask.sum()
         dist = torch.distributions.Categorical(logits=logits)
         entropy = dist.entropy()[mask]
         new_logprobs = dist.log_prob(tokens)[mask]
@@ -166,7 +192,12 @@ class GRPO(torch.nn.Module):
         if reference_logprobs is not None:
             reference_logprobs = reference_logprobs[mask]
         advantages = advantages[mask]
-        policy_loss = new_logprobs.mul(-advantages)
+        prob_ratio = torch.exp(new_logprobs - logprobs)
+        policy_loss = -torch.min(
+            prob_ratio * advantages,
+            torch.clip(prob_ratio, 1 - self.clip_epsilon, 1 + self.clip_epsilon)
+            * advantages,
+        )
         if reference_logprobs is not None:
             kl_div = torch.nn.functional.kl_div(
                 new_logprobs,
@@ -177,8 +208,10 @@ class GRPO(torch.nn.Module):
         else:
             kl_div = torch.tensor(torch.nan, device=logits.device)
         return GRPOResult(
-            num_tokens=mask.sum(),
+            num_tokens=num_tokens,
             policy_loss=policy_loss.sum(),
             entropy=entropy.sum(),
             kl_div=kl_div.sum(),
+            entropy_weight=self.entropy_coef * num_tokens,
+            kl_weight=self.kl_coef * num_tokens,
         )
