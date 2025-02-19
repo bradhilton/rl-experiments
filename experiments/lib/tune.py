@@ -20,6 +20,18 @@ from typing import Any, Callable, Literal, IO
 Verbosity = Literal[0, 1, 2]
 
 
+def clear_iteration_dirs(output_dir: str, excluding: list[int]) -> None:
+    for dir in os.listdir(output_dir):
+        if (
+            os.path.isdir(os.path.join(output_dir, dir))
+            and dir.isdigit()
+            and int(dir) not in excluding
+        ):
+            iteration_dir = os.path.join(output_dir, dir)
+            shutil.rmtree(iteration_dir)
+            print(f"Deleted iteration directory {iteration_dir}")
+
+
 def get_iteration(output_dir: str) -> int:
     try:
         return (
@@ -277,7 +289,7 @@ def _save_last_checkpoint_files(base_checkpoint_dir: str, output_dir: str) -> st
     ]:
         os.remove(file)
 
-    print(f"Saved iteration {iteration} model files to {iteration_dir}")
+    print(f"Saved iteration #{iteration} model files to {iteration_dir}")
     return iteration_dir
 
 
