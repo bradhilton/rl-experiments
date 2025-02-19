@@ -39,7 +39,7 @@ def get_iteration(output_dir: str) -> int:
 
 
 def last_tune_log(output_dir: str) -> list[dict[str, float]]:
-    sorted_logs = sorted(glob.glob(f"{output_dir}/logs/*.log"))
+    sorted_logs = sorted(glob.glob(f"{output_dir}/logs/*"))
     contents = open(sorted_logs[-1]).read()
     lines = contents.strip().splitlines()
     parsed_logs = []
