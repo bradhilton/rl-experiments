@@ -56,7 +56,7 @@ def qwen_32b() -> Model:
         base_model="deepseek-ai/DeepSeek-R1-Distill-Qwen-32B",
         tune_model=qwen2_5_32b_base,
         tune_model_type="QWEN2",
-        tune_max_batch_tokens=65536,
+        tune_max_batch_tokens=32768,
         tune_optimizer="torch.optim.AdamW",
         vllm_named_arguments={},
         tune_fsdp_cpu_offload=True,
