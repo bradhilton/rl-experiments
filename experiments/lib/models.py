@@ -44,8 +44,9 @@ def qwen_14b() -> Model:
         tune_model=qwen2_5_14b_base,
         tune_model_type="QWEN2",
         tune_max_batch_tokens=32768,
-        tune_optimizer="torchao.prototype.low_bit_optim.AdamW8bit",
+        tune_optimizer="torch.optim.AdamW",
         vllm_named_arguments={},
+        tune_fsdp_cpu_offload=True,
     )
 
 
