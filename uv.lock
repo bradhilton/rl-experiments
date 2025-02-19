@@ -286,6 +286,18 @@ wheels = [
 ]
 
 [[package]]
+name = "bitsandbytes"
+version = "0.45.2"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "numpy", marker = "sys_platform != 'darwin'" },
+    { name = "torch", marker = "sys_platform != 'darwin'" },
+]
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/db/9d/9382259196d7ad7f3550702390081224e673a705e75b5660ee377b592fc0/bitsandbytes-0.45.2-py3-none-manylinux_2_24_x86_64.whl", hash = "sha256:ba3a720187f518b172ebce4081049c682ae3fd8284947e22499b256ff99a2bc3", size = 69680042 },
+]
+
+[[package]]
 name = "black"
 version = "25.1.0"
 source = { registry = "https://pypi.org/simple" }
@@ -2228,6 +2240,7 @@ version = "0.1.0"
 source = { virtual = "." }
 dependencies = [
     { name = "aioitertools" },
+    { name = "bitsandbytes", marker = "sys_platform == 'linux'" },
     { name = "black" },
     { name = "cudo-compute" },
     { name = "datasets" },
@@ -2254,6 +2267,7 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "aioitertools", specifier = ">=0.12.0" },
+    { name = "bitsandbytes", marker = "sys_platform == 'linux'", specifier = ">=0.45.2" },
     { name = "black", specifier = ">=25.1.0" },
     { name = "cudo-compute", specifier = "==0.1.10" },
     { name = "datasets", specifier = "==3.3.0" },

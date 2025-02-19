@@ -3,9 +3,14 @@ import torch
 from torchtune.models.qwen2_5 import qwen2_5_7b_base, qwen2_5_14b_base, qwen2_5_32b_base
 from torchtune.models.llama3_1 import llama3_1_70b
 from torchtune.modules import TransformerDecoder
-from typing import Any, Callable
+from typing import Any, Callable, Literal
 
-from .recipe import ComponentConfig
+
+Optimizer = Literal[
+    "torch.optim.AdamW",
+    "torchao.prototype.low_bit_optim.AdamW8bit",
+    "bitsandbytes.optim.PagedAdamW8bit",
+]
 
 
 @dataclass
@@ -14,23 +19,21 @@ class Model:
     tune_model: Callable[[], TransformerDecoder]
     tune_model_type: str
     tune_max_batch_tokens: int
-    tune_optimizer: ComponentConfig
+    tune_optimizer: Optimizer
     vllm_named_arguments: dict[str, Any]
     tune_fsdp_cpu_offload: bool = False
 
 
 def qwen_7b() -> Model:
+    assert torch.cuda.device_count() >= 1, "Qwen-7B requires at least 1 GPU"
     return Model(
         base_model="deepseek-ai/DeepSeek-R1-Distill-Qwen-7B",
         tune_model=qwen2_5_7b_base,
         tune_model_type="QWEN2",
-        tune_max_batch_tokens=49152,
-        tune_optimizer=ComponentConfig(
-            "torch.optim.AdamW",
-            lr=2e-5,
-            fused=True,
-        ),
+        tune_max_batch_tokens=32768,
+        tune_optimizer="torch.optim.AdamW",
         vllm_named_arguments={},
+        tune_fsdp_cpu_offload=True,
     )
 
 
@@ -40,11 +43,8 @@ def qwen_14b() -> Model:
         base_model="deepseek-ai/DeepSeek-R1-Distill-Qwen-14B",
         tune_model=qwen2_5_14b_base,
         tune_model_type="QWEN2",
-        tune_max_batch_tokens=24576,
-        tune_optimizer=ComponentConfig(
-            "torchao.prototype.low_bit_optim.AdamW8bit",
-            lr=2e-5,
-        ),
+        tune_max_batch_tokens=32768,
+        tune_optimizer="torchao.prototype.low_bit_optim.AdamW8bit",
         vllm_named_arguments={},
     )
 
@@ -56,11 +56,7 @@ def qwen_32b() -> Model:
         tune_model=qwen2_5_32b_base,
         tune_model_type="QWEN2",
         tune_max_batch_tokens=65536,
-        tune_optimizer=ComponentConfig(
-            "torch.optim.AdamW",
-            lr=2e-5,
-            fused=True,
-        ),
+        tune_optimizer="torch.optim.AdamW",
         vllm_named_arguments={},
         tune_fsdp_cpu_offload=True,
     )
@@ -73,11 +69,7 @@ def llama_70b() -> Model:
         tune_model=llama3_1_70b,
         tune_model_type="LLAMA3",
         tune_max_batch_tokens=65536,
-        tune_optimizer=ComponentConfig(
-            "torch.optim.AdamW",
-            lr=2e-5,
-            fused=True,
-        ),
+        tune_optimizer="torch.optim.AdamW",
         vllm_named_arguments={},
         tune_fsdp_cpu_offload=True,
     )
