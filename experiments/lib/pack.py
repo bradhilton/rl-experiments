@@ -38,6 +38,7 @@ def packed_tensors_from_tokenized_results(
     tokenized_results: list[TokenizedResult],
     seq_len: int,
     pad_token_id: int = -100,
+    truncate_long_results: bool = True,
 ) -> PackedTensors:
     token_ids: list[list[int]] = [[]]
     group_ids: list[list[int]] = [[]]
@@ -47,7 +48,7 @@ def packed_tensors_from_tokenized_results(
     advantages: list[list[float]] = [[]]
 
     for result in tokenized_results:
-        if len(result.token_ids) > seq_len:
+        if len(result.token_ids) > seq_len and not truncate_long_results:
             print("Result is too long, skipping")
             continue
         if len(token_ids[-1]) + len(result.token_ids) > seq_len:
@@ -74,6 +75,13 @@ def packed_tensors_from_tokenized_results(
             for idx, token_logprob in zip(assistant_indices, result.token_logprobs):
                 logprobs[-1][idx + offset] = token_logprob.logprob
         advantages[-1].extend([result.advantage] * len(result.token_ids))
+        if truncate_long_results:
+            token_ids[-1] = token_ids[-1][:seq_len]
+            group_ids[-1] = group_ids[-1][:seq_len]
+            input_pos[-1] = input_pos[-1][:seq_len]
+            assistant_mask[-1] = assistant_mask[-1][:seq_len]
+            logprobs[-1] = logprobs[-1][:seq_len]
+            advantages[-1] = advantages[-1][:seq_len]
 
     def pad(values: list[list], pad_value) -> list[list]:
         max_len = seq_len
@@ -140,7 +148,7 @@ def plot_packed_tensors(packed_tensors: PackedTensors) -> None:
     ):
         plt.subplot(3, 2, subplot_idx)
         sns.heatmap(
-            tensor.numpy(), cmap="viridis", cbar_kws={"label": label}, xticklabels=False
+            tensor.numpy(), cmap="viridis", cbar_kws={"label": label}, xticklabels=False  # type: ignore
         )
         plt.title(title)
         plt.xlabel("Sequence Position")
