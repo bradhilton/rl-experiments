@@ -77,7 +77,9 @@ def get_grader(
         assert assistant_content is not None
         assistant_content = assistant_content.strip()
         parsed_groups = get_parsed_groups(
-            lines=assistant_content.split("\n")[-len(game.board) :],
+            lines=[line for line in assistant_content.split("\n") if line][
+                -len(game.board) :
+            ],
             parse_answers_liberally=parse_answers_liberally,
         )
         return sum(
