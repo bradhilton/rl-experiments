@@ -38,6 +38,22 @@ def get_iteration(output_dir: str) -> int:
         return 1
 
 
+def last_tune_log(output_dir: str) -> list[dict[str, float]]:
+    sorted_logs = sorted(glob.glob(f"{output_dir}/logs/*.log"))
+    contents = open(sorted_logs[-1]).read()
+    lines = contents.strip().splitlines()
+    parsed_logs = []
+    for line in lines:
+        step_part, metrics_part = line.split(" | ")
+        step = int(step_part.split()[1])
+        metrics = {}
+        for metric in metrics_part.split():
+            key, value = metric.split(":")
+            metrics[key] = float(value)
+        parsed_logs.append({"step": step, **metrics})
+    return parsed_logs
+
+
 async def tune(
     base_model: str,
     output_dir: str,
