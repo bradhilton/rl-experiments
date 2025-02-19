@@ -21,17 +21,21 @@ Verbosity = Literal[0, 1, 2]
 
 
 def get_iteration(output_dir: str) -> int:
-    return (
-        max(
-            (
-                int(subdir)
-                for subdir in os.listdir(output_dir)
-                if os.path.isdir(os.path.join(output_dir, subdir)) and subdir.isdigit()
-            ),
-            default=0,
+    try:
+        return (
+            max(
+                (
+                    int(subdir)
+                    for subdir in os.listdir(output_dir)
+                    if os.path.isdir(os.path.join(output_dir, subdir))
+                    and subdir.isdigit()
+                ),
+                default=0,
+            )
+            + 1
         )
-        + 1
-    )
+    except FileNotFoundError:
+        return 1
 
 
 async def tune(
