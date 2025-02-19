@@ -21,6 +21,7 @@ dependencies = [
     "torchao>=0.8.0",
     "torchtune",
     "vllm>=0.7.0",
+    "wandb>=0.19.6",
 ]
 
 [tool.uv]

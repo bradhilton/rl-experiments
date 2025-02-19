@@ -53,7 +53,7 @@ async def get_task_results(
     prices: tuple[float, float] | None = None,
     semaphore: asyncio.Semaphore | None = None,
     transform: Callable[[TaskResult], T | Awaitable[T]] = lambda x: x,
-) -> list[T]:
+) -> tuple[list[T], "TaskResultStats"]:
     num_completions = len(tasks) * n
     pbar = tqdm.tqdm(total=num_completions, desc=pbar_desc)
     stats = TaskResultStats(pbar=pbar, prices=prices)
@@ -137,11 +137,14 @@ async def get_task_results(
     else:
         _log_results = [bool(log_results)] * len(tasks)
     random.shuffle(_log_results)
-    return await asyncio.gather(
-        *(
-            get_task_result(task, client, model, log_result)
-            for task, log_result in zip(tasks, _log_results)
-        )
+    return (
+        await asyncio.gather(
+            *(
+                get_task_result(task, client, model, log_result)
+                for task, log_result in zip(tasks, _log_results)
+            )
+        ),
+        stats,
     )
 
 

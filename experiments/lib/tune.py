@@ -20,6 +20,20 @@ from typing import Any, Callable, Literal, IO
 Verbosity = Literal[0, 1, 2]
 
 
+def get_iteration(output_dir: str) -> int:
+    return (
+        max(
+            (
+                int(subdir)
+                for subdir in os.listdir(output_dir)
+                if os.path.isdir(os.path.join(output_dir, subdir)) and subdir.isdigit()
+            ),
+            default=0,
+        )
+        + 1
+    )
+
+
 async def tune(
     base_model: str,
     output_dir: str,
@@ -72,7 +86,8 @@ async def tune(
         output_dir=output_dir,
         tune_model_type=model_type,
     )
-    config.metric_logger = ComponentConfig(DiskLogger, log_dir=f"{output_dir}/logs")
+    if config.metric_logger is None:
+        config.metric_logger = ComponentConfig(DiskLogger, log_dir=f"{output_dir}/logs")
     config.model = ComponentConfig(model)
     disk_packed_tensors = packed_tensors_to_dir(packed_tensors, f"{output_dir}/tensors")
     config.dataset = ComponentConfig(
@@ -249,18 +264,7 @@ def _save_last_checkpoint_files(base_checkpoint_dir: str, output_dir: str) -> st
 def _create_iteration_dir(
     base_checkpoint_dir: str, output_dir: str, copy_model_files: bool = False
 ) -> tuple[int, str]:
-    # Find the next iteration number by looking at existing subdirectories
-    iteration = (
-        max(
-            (
-                int(subdir)
-                for subdir in os.listdir(output_dir)
-                if os.path.isdir(os.path.join(output_dir, subdir)) and subdir.isdigit()
-            ),
-            default=0,
-        )
-        + 1
-    )
+    iteration = get_iteration(output_dir)
 
     # Create a new directory for this iteration
     iteration_dir = f"{output_dir}/{iteration:04d}"
