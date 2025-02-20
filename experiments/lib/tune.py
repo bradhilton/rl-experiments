@@ -33,21 +33,17 @@ def clear_iteration_dirs(output_dir: str, excluding: list[int]) -> None:
 
 
 def get_iteration(output_dir: str) -> int:
-    try:
-        return (
-            max(
-                (
-                    int(subdir)
-                    for subdir in os.listdir(output_dir)
-                    if os.path.isdir(os.path.join(output_dir, subdir))
-                    and subdir.isdigit()
-                ),
-                default=0,
-            )
-            + 1
+    return (
+        max(
+            (
+                int(subdir)
+                for subdir in os.listdir(output_dir)
+                if os.path.isdir(os.path.join(output_dir, subdir)) and subdir.isdigit()
+            ),
+            default=0,
         )
-    except FileNotFoundError:
-        return 1
+        + 1
+    )
 
 
 def last_tune_log(output_dir: str) -> list[dict[str, float]]:
@@ -295,24 +291,19 @@ def _save_last_checkpoint_files(base_checkpoint_dir: str, output_dir: str) -> st
     return iteration_dir
 
 
-def _create_iteration_dir(
-    base_checkpoint_dir: str, output_dir: str, copy_model_files: bool = False
-) -> tuple[int, str]:
+def _create_iteration_dir(base_checkpoint_dir: str, output_dir: str) -> tuple[int, str]:
     iteration = get_iteration(output_dir)
 
     # Create a new directory for this iteration
     iteration_dir = f"{output_dir}/{iteration:04d}"
-    os.makedirs(iteration_dir, exist_ok=True)
+    os.makedirs(output_dir, exist_ok=True)
+    os.makedirs(iteration_dir, exist_ok=False)
 
     # Copy configuration files (non-model files) to the iteration directory
     for file in os.listdir(base_checkpoint_dir):
         if not any(
             file.endswith(suffix)
-            for suffix in (
-                ()
-                if copy_model_files
-                else (".safetensors", ".pt", ".ckpt", ".bin", ".pth", ".h5")
-            )
+            for suffix in (".safetensors", ".pt", ".ckpt", ".bin", ".pth", ".h5")
         ):
             src = os.path.join(base_checkpoint_dir, file)
             dst = os.path.join(iteration_dir, file)
