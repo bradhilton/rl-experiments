@@ -108,6 +108,7 @@ class GRPO(torch.nn.Module):
         logprobs: torch.Tensor,
         reference_logprobs: torch.Tensor | None,
         mask: torch.Tensor,
+        weights: torch.Tensor,
         bos_id: int,
     ) -> GRPOResult:
         """
@@ -133,6 +134,9 @@ class GRPO(torch.nn.Module):
             mask (Tensor):
                 Shape: (batch_size, sequence_length)
                 Boolean mask specifying positions where loss should be computed.
+            weights (Tensor):
+                Shape: (batch_size, sequence_length)
+                Weights for each token.
             bos_id (int):
                 Index of the beginning of sequence token in the vocabulary.
 
@@ -153,12 +157,20 @@ class GRPO(torch.nn.Module):
                     else [None] * num_chunks
                 ),
                 mask.chunk(num_chunks, dim=1),
+                weights.chunk(num_chunks, dim=1),
             ):
                 result += self._forward_chunk(*chunked_args, bos_id=bos_id)
             return result
 
         return self._forward_chunk(
-            logits, tokens, advantages, logprobs, reference_logprobs, mask, bos_id
+            logits,
+            tokens,
+            advantages,
+            logprobs,
+            reference_logprobs,
+            mask,
+            weights,
+            bos_id,
         )
 
     def _forward_chunk(
@@ -169,6 +181,7 @@ class GRPO(torch.nn.Module):
         logprobs: torch.Tensor,
         reference_logprobs: torch.Tensor | None,
         mask: torch.Tensor,
+        weights: torch.Tensor,
         bos_id: int,
     ) -> GRPOResult:
         """
@@ -186,6 +199,7 @@ class GRPO(torch.nn.Module):
         if reference_logprobs is not None:
             reference_logprobs = shift_tensor(reference_logprobs, 0).view(-1)
         mask = shift_tensor(mask, False).view(-1)  # (batch_size * sequence_length,)
+        weights = shift_tensor(weights, 0).view(-1)  # (batch_size * sequence_length,)
         num_tokens = mask.sum()
         dist = torch.distributions.Categorical(logits=logits)
         entropy = dist.entropy()[mask]
@@ -213,11 +227,12 @@ class GRPO(torch.nn.Module):
             )
         else:
             kl_div = torch.tensor(torch.nan, device=logits.device)
+        weights = weights[mask]
         return GRPOResult(
             num_tokens=num_tokens,
-            policy_loss=policy_loss.sum(),
-            entropy=entropy.sum(),
-            kl_div=kl_div.sum(),
+            policy_loss=policy_loss.mul(weights).sum(),
+            entropy=entropy.mul(weights).sum(),
+            kl_div=kl_div.mul(weights).sum(),
             entropy_weight=self.entropy_coef * num_tokens,
             kl_weight=self.kl_coef * num_tokens,
         )

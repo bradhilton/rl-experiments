@@ -17,6 +17,7 @@ class PackedTensors(TypedDict):
     assistant_mask: torch.Tensor
     logprobs: torch.Tensor
     advantages: torch.Tensor
+    weights: torch.Tensor
 
 
 class DiskPackedTensors(TypedDict):
@@ -49,7 +50,7 @@ def packed_tensors_from_tokenized_results(
     assistant_mask: list[list[int]] = [[]]
     logprobs: list[list[float]] = [[]]
     advantages: list[list[float]] = [[]]
-
+    weights: list[list[float]] = [[]]
     for result in tokenized_results:
         if len(result.token_ids) > seq_len and not truncate_long_results:
             print("Result is too long, skipping")
@@ -71,6 +72,7 @@ def packed_tensors_from_tokenized_results(
             assistant_mask.append([])
             logprobs.append([])
             advantages.append([])
+            weights.append([])
         group_id = random.randint(-(2**63), 2**63 - 1)
         if result.prompt_id in group_ids[-1]:
             result = result_without_prompt
@@ -80,7 +82,7 @@ def packed_tensors_from_tokenized_results(
             + [group_id] * (len(result.token_ids) - result.prompt_length)
         )
         parent_ids[-1].extend([result.prompt_id] * len(result.token_ids))
-        input_pos[-1].extend(range(len(result.token_ids)))
+        input_pos[-1].extend(result.input_pos)
         assistant_mask[-1].extend(result.assistant_mask)
         offset = len(logprobs[-1])
         logprobs[-1].extend([float("nan")] * len(result.token_ids))
@@ -92,6 +94,7 @@ def packed_tensors_from_tokenized_results(
             for idx, token_logprob in zip(assistant_indices, result.token_logprobs):
                 logprobs[-1][idx + offset] = token_logprob.logprob
         advantages[-1].extend([result.advantage] * len(result.token_ids))
+        weights[-1].extend([1 / sum(result.assistant_mask)] * len(result.token_ids))
         if truncate_long_results:
             token_ids[-1] = token_ids[-1][:seq_len]
             group_ids[-1] = group_ids[-1][:seq_len]
@@ -99,6 +102,7 @@ def packed_tensors_from_tokenized_results(
             assistant_mask[-1] = assistant_mask[-1][:seq_len]
             logprobs[-1] = logprobs[-1][:seq_len]
             advantages[-1] = advantages[-1][:seq_len]
+            weights[-1] = weights[-1][:seq_len]
 
     def pad(values: list[list], pad_value) -> list[list]:
         max_len = seq_len
@@ -106,14 +110,24 @@ def packed_tensors_from_tokenized_results(
             value.extend([pad_value] * (max_len - len(value)))
         return values
 
+    assistant_mask_tensor = torch.tensor(pad(assistant_mask, 0), dtype=torch.bool)
+    weights_tensor = torch.tensor(pad(weights, 0.0))
+    weights_tensor = torch.where(
+        assistant_mask_tensor, weights_tensor, torch.zeros_like(weights_tensor)
+    )
+    weights_tensor[assistant_mask_tensor] /= weights_tensor[
+        assistant_mask_tensor
+    ].mean()
+
     return {
         "tokens": torch.tensor(pad(token_ids, pad_token_id)),
         "group_ids": torch.tensor(pad(group_ids, -1)),
         "parent_ids": torch.tensor(pad(parent_ids, -1)),
         "input_pos": torch.tensor(pad(input_pos, 0)),
-        "assistant_mask": torch.tensor(pad(assistant_mask, 0), dtype=torch.bool),
+        "assistant_mask": assistant_mask_tensor,
         "logprobs": torch.tensor(pad(logprobs, float("nan"))),
         "advantages": torch.tensor(pad(advantages, 0.0)),
+        "weights": weights_tensor,
     }
 
 
@@ -138,6 +152,7 @@ def packed_tensors_from_dir(**kwargs: Unpack[DiskPackedTensors]) -> PackedTensor
             "assistant_mask": torch.bool,
             "logprobs": torch.float32,
             "advantages": torch.float32,
+            "weights": torch.float32,
         }.items()
     }  # type: ignore
 

@@ -1142,6 +1142,7 @@ class TuneRecipe(FTRecipeInterface):
                     logprobs=batch["logprobs"],
                     reference_logprobs=reference_logprobs,
                     mask=batch["assistant_mask"],
+                    weights=batch["weights"],
                     bos_id=bos_id,
                 )
                 del logits, batch

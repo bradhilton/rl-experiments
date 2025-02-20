@@ -18,6 +18,7 @@ class TokenizedResult:
     chat: str
     tokens: list[str]
     token_ids: list[int]
+    input_pos: list[int]
     assistant_mask: list[int]
     token_logprobs: list[ChatCompletionTokenLogprob] | None
     prompt_id: int = 0
@@ -31,6 +32,7 @@ class TokenizedResult:
             chat=self.chat,
             tokens=self.tokens[self.prompt_length :],
             token_ids=self.token_ids[self.prompt_length :],
+            input_pos=self.input_pos[self.prompt_length :],
             assistant_mask=self.assistant_mask[self.prompt_length :],
             token_logprobs=self.token_logprobs,
             prompt_id=self.prompt_id,
@@ -75,6 +77,8 @@ class TaskResultTokenizer:
         for result in tokenized_results:
             result.prompt_id = prompt_id
             result.prompt_length = prompt_length
+            # zero out assistant prompt tokens
+            result.assistant_mask[:prompt_length] = [0] * prompt_length
         return tokenized_results
 
     def _tokenized_result(
@@ -152,6 +156,7 @@ class TaskResultTokenizer:
             chat=chat,
             tokens=tokens,
             token_ids=tokenized_result["input_ids"],
+            input_pos=list(range(len(tokens))),
             assistant_mask=tokenized_result["assistant_masks"],
             token_logprobs=token_logprobs,
         )
