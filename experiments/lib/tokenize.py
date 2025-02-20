@@ -25,6 +25,7 @@ class TokenizedResult:
     prompt_length: int = 0
 
     def without_prompt(self) -> "TokenizedResult":
+        assistant_mask = self.assistant_mask[self.prompt_length :]
         return TokenizedResult(
             conversation=self.conversation,
             advantage=self.advantage,
@@ -33,8 +34,12 @@ class TokenizedResult:
             tokens=self.tokens[self.prompt_length :],
             token_ids=self.token_ids[self.prompt_length :],
             input_pos=self.input_pos[self.prompt_length :],
-            assistant_mask=self.assistant_mask[self.prompt_length :],
-            token_logprobs=self.token_logprobs,
+            assistant_mask=assistant_mask,
+            token_logprobs=(
+                self.token_logprobs[len(self.token_logprobs) - sum(assistant_mask) :]
+                if self.token_logprobs is not None
+                else None
+            ),
             prompt_id=self.prompt_id,
             prompt_length=0,
         )
@@ -90,7 +95,6 @@ class TaskResultTokenizer:
                 "content": choice.message.content,
             }
         ]
-        assert isinstance(self.tokenizer.chat_template, str)
         chat_template = (
             self.tokenizer.get_chat_template()
             # Remove template logic that strips reasoning content from the chat messages
@@ -102,6 +106,11 @@ class TaskResultTokenizer:
             .replace(
                 "{{'<｜Assistant｜>' + content + '<｜end▁of▁sentence｜>'}}",
                 "{{'<｜Assistant｜>'}}{% generation %}{{ content }}{% endgeneration %}{{'<｜end▁of▁sentence｜>'}}",
+            )
+            # Add generation tags for assistant token masking (for Hermes 2 Theta)
+            .replace(
+                "{{'<|im_start|>' + message['role'] + '\n' + message['content'] + '<|im_end|>' + '\n'}}",
+                "{{'<|im_start|>' + message['role'] + '\n'}}{% if message['role'] == 'assistant' %}{% generation %}{{ message['content'] }}{% endgeneration %}{% else %}{{ message['content'] }}{% endif %}{{'<|im_end|>' + '\n'}}",
             )
         )
         chat = cast(

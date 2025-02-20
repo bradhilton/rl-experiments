@@ -90,14 +90,20 @@ def packed_tensors_from_tokenized_results(
             assistant_indices = [
                 i for i, mask in enumerate(result.assistant_mask) if mask
             ]
-            assert len(assistant_indices) == len(result.token_logprobs)
-            for idx, token_logprob in zip(assistant_indices, result.token_logprobs):
+            assert len(assistant_indices) <= len(result.token_logprobs)
+            for idx, token_logprob in zip(
+                assistant_indices,
+                result.token_logprobs[
+                    len(result.token_logprobs) - len(assistant_indices) :
+                ],
+            ):
                 logprobs[-1][idx + offset] = token_logprob.logprob
         advantages[-1].extend([result.advantage] * len(result.token_ids))
         weights[-1].extend([1 / sum(result.assistant_mask)] * len(result.token_ids))
         if truncate_long_results:
             token_ids[-1] = token_ids[-1][:seq_len]
             group_ids[-1] = group_ids[-1][:seq_len]
+            parent_ids[-1] = parent_ids[-1][:seq_len]
             input_pos[-1] = input_pos[-1][:seq_len]
             assistant_mask[-1] = assistant_mask[-1][:seq_len]
             logprobs[-1] = logprobs[-1][:seq_len]
@@ -170,17 +176,19 @@ def packed_tensors_to_dir(tensors: PackedTensors, dir: str) -> DiskPackedTensors
 
 
 def plot_packed_tensors(packed_tensors: PackedTensors) -> None:
-    plt.figure(figsize=(15, 15))
+    plt.figure(figsize=(15, 20))
 
     for tensor, label, title, subplot_idx in (
         (packed_tensors["tokens"], "Token IDs", "Token IDs", 1),
         (packed_tensors["logprobs"], "Log Probabilities", "Token Log Probs", 2),
         (packed_tensors["group_ids"], "Group IDs", "Token Groups", 3),
-        (packed_tensors["input_pos"], "Position", "Input Position", 4),
-        (packed_tensors["assistant_mask"], "Assistant Mask", "Assistant Mask", 5),
-        (packed_tensors["advantages"], "Advantages", "Token Advantages", 6),
+        (packed_tensors["parent_ids"], "Parent IDs", "Parent IDs", 4),
+        (packed_tensors["input_pos"], "Position", "Input Position", 5),
+        (packed_tensors["assistant_mask"], "Assistant Mask", "Assistant Mask", 6),
+        (packed_tensors["advantages"], "Advantages", "Token Advantages", 7),
+        (packed_tensors["weights"], "Weights", "Token Weights", 8),
     ):
-        plt.subplot(3, 2, subplot_idx)
+        plt.subplot(4, 2, subplot_idx)
         sns.heatmap(
             tensor.numpy(), cmap="viridis", cbar_kws={"label": label}, xticklabels=False  # type: ignore
         )
