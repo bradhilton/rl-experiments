@@ -1,6 +1,8 @@
 from dataclasses import dataclass
+from itertools import takewhile
 from openai.types.chat.chat_completion import Choice
 from openai.types.chat.chat_completion_token_logprob import ChatCompletionTokenLogprob
+import random
 from transformers import AutoTokenizer, PreTrainedTokenizer, PreTrainedTokenizerFast
 from typing import cast
 
@@ -18,6 +20,22 @@ class TokenizedResult:
     token_ids: list[int]
     assistant_mask: list[int]
     token_logprobs: list[ChatCompletionTokenLogprob] | None
+    prompt_id: int = 0
+    prompt_length: int = 0
+
+    def without_prompt(self) -> "TokenizedResult":
+        return TokenizedResult(
+            conversation=self.conversation,
+            advantage=self.advantage,
+            chat_template=self.chat_template,
+            chat=self.chat,
+            tokens=self.tokens[self.prompt_length :],
+            token_ids=self.token_ids[self.prompt_length :],
+            assistant_mask=self.assistant_mask[self.prompt_length :],
+            token_logprobs=self.token_logprobs,
+            prompt_id=self.prompt_id,
+            prompt_length=0,
+        )
 
 
 class TaskResultTokenizer:
@@ -34,15 +52,30 @@ class TaskResultTokenizer:
         )
 
     def __call__(self, task_result: TaskResult) -> list[TokenizedResult]:
-        return [
+        chat_completions = task_result.chat_completions.copy()
+        random.shuffle(chat_completions)
+        tokenized_results = [
             self._tokenized_result(
                 task_result,
                 choice,
                 task_result.advantages[(chat_completion.id, choice.index)],
             )
-            for chat_completion in task_result.chat_completions
+            for chat_completion in chat_completions
             for choice in chat_completion.choices
         ]
+        prompt_id = random.randint(-(2**63), 2**63 - 1)
+        prompt_length = len(
+            list(
+                takewhile(
+                    lambda x: len(set(x)) == 1,
+                    zip(*(r.token_ids for r in tokenized_results)),
+                )
+            )
+        )
+        for result in tokenized_results:
+            result.prompt_id = prompt_id
+            result.prompt_length = prompt_length
+        return tokenized_results
 
     def _tokenized_result(
         self, task_result: TaskResult, choice: Choice, advantage: float

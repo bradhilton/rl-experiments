@@ -1072,7 +1072,10 @@ class TuneRecipe(FTRecipeInterface):
                 group_mask = batch["group_ids"].unsqueeze(2) == batch[
                     "group_ids"
                 ].unsqueeze(1)
-                mask = causal_mask & group_mask
+                parent_mask = batch["parent_ids"].unsqueeze(2) == batch[
+                    "group_ids"
+                ].unsqueeze(1)
+                mask = causal_mask & (group_mask | parent_mask)
 
                 if self.reference_model_state_dict:
                     # Save current weights and load reference weights

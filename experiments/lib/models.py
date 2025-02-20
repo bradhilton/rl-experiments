@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 import torch
 from torchtune.models.qwen2_5 import qwen2_5_7b_base, qwen2_5_14b_base, qwen2_5_32b_base
-from torchtune.models.llama3_1 import llama3_1_70b
+from torchtune.models.llama3_1 import llama3_1_8b, llama3_1_70b
 from torchtune.modules import TransformerDecoder
 from typing import Any, Callable, Literal
 
@@ -31,6 +31,19 @@ def qwen_7b() -> Model:
         base_model="deepseek-ai/DeepSeek-R1-Distill-Qwen-7B",
         tune_model=qwen2_5_7b_base,
         tune_model_type="QWEN2",
+        tune_max_batch_tokens=32768,
+        tune_optimizer="torch.optim.AdamW",
+        vllm_named_arguments={},
+        tune_fsdp_cpu_offload=True,
+    )
+
+
+def theta_8b() -> Model:
+    assert torch.cuda.device_count() >= 1, "Llama-8B requires at least 1 GPU"
+    return Model(
+        base_model="NousResearch/Hermes-2-Theta-Llama-3-8B",
+        tune_model=llama3_1_8b,
+        tune_model_type="LLAMA3",
         tune_max_batch_tokens=32768,
         tune_optimizer="torch.optim.AdamW",
         vllm_named_arguments={},

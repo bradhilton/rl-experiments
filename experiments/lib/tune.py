@@ -47,6 +47,13 @@ def get_iteration(output_dir: str) -> int:
     )
 
 
+def get_model_name(output_dir: str) -> str | None:
+    last_iteration_dir = os.path.join(
+        output_dir, f"{get_iteration(output_dir) - 1:04d}"
+    )
+    return last_iteration_dir if os.path.exists(last_iteration_dir) else None
+
+
 def last_tune_log(output_dir: str) -> list[dict[str, float]]:
     sorted_logs = sorted(glob.glob(f"{output_dir}/logs/*"))
     contents = open(sorted_logs[-1]).read()

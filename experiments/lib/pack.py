@@ -1,5 +1,6 @@
 import matplotlib.pyplot as plt
 import os
+import random
 import seaborn as sns
 import torch
 from torch.utils.data import Dataset
@@ -11,6 +12,7 @@ from .tokenize import TokenizedResult
 class PackedTensors(TypedDict):
     tokens: torch.Tensor
     group_ids: torch.Tensor
+    parent_ids: torch.Tensor
     input_pos: torch.Tensor
     assistant_mask: torch.Tensor
     logprobs: torch.Tensor
@@ -42,6 +44,7 @@ def packed_tensors_from_tokenized_results(
 ) -> PackedTensors:
     token_ids: list[list[int]] = [[]]
     group_ids: list[list[int]] = [[]]
+    parent_ids: list[list[int]] = [[]]
     input_pos: list[list[int]] = [[]]
     assistant_mask: list[list[int]] = [[]]
     logprobs: list[list[float]] = [[]]
@@ -51,18 +54,32 @@ def packed_tensors_from_tokenized_results(
         if len(result.token_ids) > seq_len and not truncate_long_results:
             print("Result is too long, skipping")
             continue
-        if len(token_ids[-1]) + len(result.token_ids) > seq_len:
+        result_without_prompt = result.without_prompt()
+        if (
+            len(token_ids[-1])
+            + (
+                len(result_without_prompt.token_ids)
+                if result.prompt_id in group_ids[-1]
+                else len(result.token_ids)
+            )
+            > seq_len
+        ):
             token_ids.append([])
             group_ids.append([])
+            parent_ids.append([])
             input_pos.append([])
             assistant_mask.append([])
             logprobs.append([])
             advantages.append([])
-            group_id = 0
-        else:
-            group_id = max(group_ids[-1], default=-1) + 1
+        group_id = random.randint(-(2**63), 2**63 - 1)
+        if result.prompt_id in group_ids[-1]:
+            result = result_without_prompt
         token_ids[-1].extend(result.token_ids)
-        group_ids[-1].extend([group_id] * len(result.token_ids))
+        group_ids[-1].extend(
+            [result.prompt_id] * result.prompt_length
+            + [group_id] * (len(result.token_ids) - result.prompt_length)
+        )
+        parent_ids[-1].extend([result.prompt_id] * len(result.token_ids))
         input_pos[-1].extend(range(len(result.token_ids)))
         assistant_mask[-1].extend(result.assistant_mask)
         offset = len(logprobs[-1])
@@ -92,6 +109,7 @@ def packed_tensors_from_tokenized_results(
     return {
         "tokens": torch.tensor(pad(token_ids, pad_token_id)),
         "group_ids": torch.tensor(pad(group_ids, -1)),
+        "parent_ids": torch.tensor(pad(parent_ids, -1)),
         "input_pos": torch.tensor(pad(input_pos, 0)),
         "assistant_mask": torch.tensor(pad(assistant_mask, 0), dtype=torch.bool),
         "logprobs": torch.tensor(pad(logprobs, float("nan"))),
@@ -115,6 +133,7 @@ def packed_tensors_from_dir(**kwargs: Unpack[DiskPackedTensors]) -> PackedTensor
         for key, dtype in {
             "tokens": torch.long,
             "group_ids": torch.long,
+            "parent_ids": torch.long,
             "input_pos": torch.long,
             "assistant_mask": torch.bool,
             "logprobs": torch.float32,
