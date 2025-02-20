@@ -1,3 +1,4 @@
+import asyncio
 import black
 from contextlib import contextmanager
 import os
@@ -43,3 +44,28 @@ def symlink_shm(relative_path: str) -> str | None:
         os.makedirs(shm_dir, exist_ok=True)
     os.symlink(shm_dir, output_dir, target_is_directory=True)
     return shm_dir.as_posix()
+
+
+async def rsync_dir(relative_path: str, destination: str) -> None:
+    abs_path = Path(relative_path).absolute().as_posix()
+    destination = (
+        Path(destination).joinpath(*Path(relative_path).parts).absolute().as_posix()
+    )
+    os.makedirs("./logs", exist_ok=True)
+    with open("./logs/rsync.log", "w") as log_file:
+        process = await asyncio.create_subprocess_shell(
+            f"gsutil -m rsync -r {abs_path} {destination}",
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+
+        async def log_output(stream):
+            while True:
+                line = await stream.readline()
+                if not line:
+                    break
+                log_file.write(line.decode())
+                log_file.flush()
+
+        await asyncio.gather(log_output(process.stdout), log_output(process.stderr))
+        await process.wait()

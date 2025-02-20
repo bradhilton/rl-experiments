@@ -33,23 +33,18 @@ def clear_iteration_dirs(output_dir: str, excluding: list[int]) -> None:
 
 def get_iteration(output_dir: str) -> int:
     os.makedirs(output_dir, exist_ok=True)
-    return (
-        max(
-            (
-                int(subdir)
-                for subdir in os.listdir(output_dir)
-                if os.path.isdir(os.path.join(output_dir, subdir)) and subdir.isdigit()
-            ),
-            default=0,
-        )
-        + 1
+    return max(
+        (
+            int(subdir)
+            for subdir in os.listdir(output_dir)
+            if os.path.isdir(os.path.join(output_dir, subdir)) and subdir.isdigit()
+        ),
+        default=0,
     )
 
 
-def get_model_name(output_dir: str) -> str | None:
-    last_iteration_dir = os.path.join(
-        output_dir, f"{get_iteration(output_dir) - 1:04d}"
-    )
+def get_last_iteration_dir(output_dir: str) -> str | None:
+    last_iteration_dir = os.path.join(output_dir, f"{get_iteration(output_dir):04d}")
     return last_iteration_dir if os.path.exists(last_iteration_dir) else None
 
 
@@ -300,10 +295,10 @@ def _save_last_checkpoint_files(base_checkpoint_dir: str, output_dir: str) -> st
 
 
 def _create_iteration_dir(base_checkpoint_dir: str, output_dir: str) -> tuple[int, str]:
-    iteration = get_iteration(output_dir)
+    next_iteration = get_iteration(output_dir) + 1
 
     # Create a new directory for this iteration
-    iteration_dir = f"{output_dir}/{iteration:04d}"
+    iteration_dir = f"{output_dir}/{next_iteration:04d}"
     os.makedirs(output_dir, exist_ok=True)
     os.makedirs(iteration_dir, exist_ok=False)
 
@@ -320,4 +315,4 @@ def _create_iteration_dir(base_checkpoint_dir: str, output_dir: str) -> tuple[in
             else:
                 shutil.copy2(src, dst)
 
-    return iteration, iteration_dir
+    return next_iteration, iteration_dir
