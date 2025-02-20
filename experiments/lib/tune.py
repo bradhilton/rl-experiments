@@ -159,7 +159,7 @@ def _get_checkpointer_config(
         checkpoint_dir=checkpoint_dir,
         checkpoint_files=checkpoint_files
         or [
-            file
+            os.path.basename(file)
             for ext in ["safetensors", "pt", "ckpt", "bin", "pth"]
             for file in glob.glob(f"{checkpoint_dir}/*.{ext}")
             if not file.endswith("mlp_head.pt")

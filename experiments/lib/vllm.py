@@ -17,10 +17,6 @@ class vLLM:
     model: str
     process: asyncio.subprocess.Process
 
-    def __del__(self) -> None:
-        self.process.terminate()
-        kill_vllm_workers()
-
 
 async def start_vllm(
     model: str,
