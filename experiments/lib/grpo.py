@@ -83,6 +83,7 @@ class GRPO(torch.nn.Module):
         clip_epsilon: float = 0.2,
         entropy_coef: float = 0.0,
         kl_coef: float = 0.0,
+        tanh: bool = False,
     ) -> None:
         """
         Initialize the GRPO loss.
@@ -91,11 +92,13 @@ class GRPO(torch.nn.Module):
             clip_epsilon (float): The epsilon value for clipping the policy ratio.
             entropy_coef (float): The coefficient for the entropy bonus.
             kl_coef (float): The coefficient for the KL divergence penalty.
+            tanh (bool): Whether to use an alternative "soft" clipping method.
         """
         super().__init__()
         self.clip_epsilon = clip_epsilon
         self.entropy_coef = entropy_coef
         self.kl_coef = kl_coef
+        self.tanh = tanh
 
     def forward(
         self,
@@ -192,12 +195,15 @@ class GRPO(torch.nn.Module):
         if reference_logprobs is not None:
             reference_logprobs = reference_logprobs[mask]
         advantages = advantages[mask]
-        prob_ratio = torch.exp(new_logprobs - logprobs)
-        policy_loss = -torch.min(
-            prob_ratio * advantages,
-            torch.clip(prob_ratio, 1 - self.clip_epsilon, 1 + self.clip_epsilon)
-            * advantages,
-        )
+        if self.tanh:
+            policy_loss = -torch.tanh(new_logprobs - logprobs).mul(advantages)
+        else:
+            prob_ratio = torch.exp(new_logprobs - logprobs)
+            policy_loss = -torch.min(
+                prob_ratio * advantages,
+                torch.clip(prob_ratio, 1 - self.clip_epsilon, 1 + self.clip_epsilon)
+                * advantages,
+            )
         if reference_logprobs is not None:
             kl_div = torch.nn.functional.kl_div(
                 new_logprobs,

@@ -113,11 +113,13 @@ async def tune(
         output_dir=output_dir,
         tune_model_type=model_type,
     )
-    config.reference_checkpointer = _get_checkpointer_config(
-        checkpoint_dir=base_checkpoint_dir,
-        output_dir=output_dir,
-        tune_model_type=model_type,
-    )
+    if config.loss.kl_coef > 0:
+        print("Using reference checkpointer")
+        config.reference_checkpointer = _get_checkpointer_config(
+            checkpoint_dir=base_checkpoint_dir,
+            output_dir=output_dir,
+            tune_model_type=model_type,
+        )
     if config.metric_logger is None:
         config.metric_logger = ComponentConfig(DiskLogger, log_dir=f"{output_dir}/logs")
     config.model = ComponentConfig(model)

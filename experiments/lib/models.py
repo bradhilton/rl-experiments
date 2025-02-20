@@ -22,6 +22,7 @@ class Model:
     tune_optimizer: Optimizer
     vllm_named_arguments: dict[str, Any]
     tune_fsdp_cpu_offload: bool = False
+    tune_num_output_chunks: int = 8
 
 
 def qwen_7b() -> Model:
@@ -47,6 +48,7 @@ def qwen_14b() -> Model:
         tune_optimizer="torch.optim.AdamW",
         vllm_named_arguments={},
         tune_fsdp_cpu_offload=True,
+        tune_num_output_chunks=2,
     )
 
 
