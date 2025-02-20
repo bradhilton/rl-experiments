@@ -33,6 +33,7 @@ def clear_iteration_dirs(output_dir: str, excluding: list[int]) -> None:
 
 
 def get_iteration(output_dir: str) -> int:
+    os.makedirs(output_dir, exist_ok=True)
     return (
         max(
             (
@@ -102,10 +103,14 @@ async def tune(
         base_checkpoint_dir = "\n".join(base_stdout).strip()
 
     # Setup a symlink to /dev/shm for the output directory if present
-    setup_shm_symlink(output_dir)
+    # setup_shm_symlink(output_dir)
 
     config.checkpointer = _get_checkpointer_config(
-        checkpoint_dir=base_checkpoint_dir,
+        checkpoint_dir=max(
+            (d for d in glob.glob(f"{output_dir}/*") if d.split("/")[-1].isdigit()),
+            key=lambda x: int(x.split("/")[-1]),
+            default=base_checkpoint_dir,
+        ),
         output_dir=output_dir,
         tune_model_type=model_type,
     )
