@@ -210,7 +210,7 @@ class TaskResultStats:
             self.exceptions += 1
         postfix = {
             "completion_tokens": round(self.completion_tokens / max(self.usages, 1)),
-            "prompt_tokens": self.prompt_tokens / max(self.usages, 1),
+            "prompt_tokens": round(self.prompt_tokens / max(self.usages, 1)),
             "reward": self.total_reward / max(self.grades, 1),
         }
         if self.prices:
