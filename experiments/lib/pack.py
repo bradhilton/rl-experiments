@@ -100,7 +100,7 @@ def packed_tensors_from_tokenized_results(
                     len(result.token_logprobs) - len(assistant_indices) :
                 ],
             ):
-                logprobs[-1][idx + offset] = token_logprob.logprob
+                logprobs[-1][idx + offset] = token_logprob.logprob or float("nan")
         advantages[-1].extend([result.advantage] * len(result.token_ids))
         weights[-1].extend([1 / sum(result.assistant_mask)] * len(result.token_ids))
         if truncate_long_results:
