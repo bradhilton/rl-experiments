@@ -48,7 +48,12 @@ def symlink_shm(relative_path: str) -> str | None:
 
 async def rsync_dir(relative_path: str, destination: str) -> None:
     abs_path = Path(relative_path).absolute().as_posix()
-    destination = Path(destination).joinpath(*Path(relative_path).parts).as_posix()
+    destination = (
+        Path(destination)
+        .joinpath(*Path(relative_path).parts)
+        .as_posix()
+        .replace("gs:/", "gs://")
+    )
     print(f"rsyncing {abs_path} to {destination}")
     os.makedirs("./logs", exist_ok=True)
     with open("./logs/rsync.log", "w") as log_file:
