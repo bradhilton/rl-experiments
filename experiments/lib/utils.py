@@ -58,7 +58,7 @@ async def rsync_dir(relative_path: str, destination: str) -> None:
     os.makedirs("./logs", exist_ok=True)
     with open("./logs/rsync.log", "w") as log_file:
         process = await asyncio.create_subprocess_shell(
-            f"gsutil -m rsync -r {abs_path} {destination}",
+            f"gsutil -m rsync -r -d {abs_path} {destination}",
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
         )
