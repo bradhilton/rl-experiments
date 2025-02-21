@@ -19,7 +19,10 @@ class ChatCompletionParams(CreateParams, total=False):
     model: Never
 
 
-Grader = Callable[[Choice], float | Awaitable[float]]
+# A grader function returns a floating-point reward,
+# and optionally a dictionary of metrics as the second return value
+Grade = float | tuple[float, dict[str, float]]
+Grader = Callable[[Choice], Grade | Awaitable[Grade]]
 
 
 @dataclass
@@ -33,6 +36,7 @@ class TaskResult:
     task: Task
     chat_completions: list[ChatCompletion]
     rewards: dict[tuple[str, int], float]
+    metrics: dict[tuple[str, int], dict[str, float]]
     advantages: dict[tuple[str, int], float]
     exceptions: list[Exception]
 
@@ -72,6 +76,7 @@ async def get_task_results(
             _params["logprobs"] = True
         chat_completions: list[ChatCompletion] = []
         rewards: dict[tuple[str, int], float] = {}
+        metrics: dict[tuple[str, int], dict[str, float]] = {}
         exceptions: list[Exception] = []
         for chat_completion_future in asyncio.as_completed(
             get_chat_completion(
@@ -95,16 +100,22 @@ async def get_task_results(
                 chat_completions.append(chat_completion)
                 stats.update(id=chat_completion.id, usage=chat_completion.usage)
 
-                async def _grade(choice: Choice, grader: Grader) -> tuple[int, float]:
+                async def _grade(choice: Choice, grader: Grader) -> tuple[int, Grade]:
                     return choice.index, await maybe_await(grader(choice))
 
-                for reward_future in asyncio.as_completed(
+                for grade_future in asyncio.as_completed(
                     _grade(choice, task.grader) for choice in chat_completion.choices
                 ):
                     try:
-                        choice_index, reward = await reward_future
-                        stats.update(id=chat_completion.id, reward=reward)
+                        choice_index, grade = await grade_future
+                        reward, _metrics = (
+                            grade if isinstance(grade, tuple) else (grade, {})
+                        )
+                        stats.update(
+                            id=chat_completion.id, reward=reward, metrics=_metrics
+                        )
                         rewards[chat_completion.id, choice_index] = reward
+                        metrics[chat_completion.id, choice_index] = _metrics
                     except Exception as e:
                         exceptions.append(e)
                         stats.update(id=chat_completion.id, exception=e)
@@ -128,6 +139,7 @@ async def get_task_results(
                     task=task,
                     chat_completions=chat_completions,
                     rewards=rewards,
+                    metrics=metrics,
                     advantages=advantages,
                     exceptions=exceptions,
                 )
@@ -172,6 +184,7 @@ class TaskResultStats:
     new_prompt_tokens: int = 0
     prompt_tokens: int = 0
     token_logprobs: int = 0
+    total_metrics: dict[str, float] = field(default_factory=dict)
     total_reward: float = 0
     usages: int = 0
 
@@ -185,6 +198,7 @@ class TaskResultStats:
         chunk: ChatCompletionChunk | None = None,
         usage: CompletionUsage | None = None,
         reward: float | None = None,
+        metrics: dict[str, float] | None = None,
         exception: Exception | None = None,
     ) -> None:
         if chunk:
@@ -206,6 +220,11 @@ class TaskResultStats:
             self.grades += 1
             self.total_reward += reward
             self.pbar.update()
+            if metrics:
+                for key, value in metrics.items():
+                    if key not in self.total_metrics:
+                        self.total_metrics[key] = 0
+                    self.total_metrics[key] += value
         elif exception:
             self.exceptions += 1
         postfix = {
@@ -213,6 +232,8 @@ class TaskResultStats:
             "prompt_tokens": round(self.prompt_tokens / max(self.usages, 1)),
             "reward": self.total_reward / max(self.grades, 1),
         }
+        for key, value in self.total_metrics.items():
+            postfix[key] = value / max(self.grades, 1)
         if self.prices:
             postfix["spend"] = (
                 f"${(
