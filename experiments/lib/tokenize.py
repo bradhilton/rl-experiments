@@ -95,24 +95,7 @@ class TaskResultTokenizer:
                 "content": choice.message.content,
             }
         ]
-        chat_template = (
-            self.tokenizer.get_chat_template()
-            # Remove template logic that strips reasoning content from the chat messages
-            .replace(
-                "{% if '</think>' in content %}{% set content = content.split('</think>')[-1] %}{% endif %}",
-                "",
-            )
-            # Add generation tags for assistant token masking
-            .replace(
-                "{{'<｜Assistant｜>' + content + '<｜end▁of▁sentence｜>'}}",
-                "{{'<｜Assistant｜>'}}{% generation %}{{ content }}{% endgeneration %}{{'<｜end▁of▁sentence｜>'}}",
-            )
-            # Add generation tags for assistant token masking (for Hermes 2 Theta)
-            .replace(
-                "{{'<|im_start|>' + message['role'] + '\n' + message['content'] + '<|im_end|>' + '\n'}}",
-                "{{'<|im_start|>' + message['role'] + '\n'}}{% if message['role'] == 'assistant' %}{% generation %}{{ message['content'] }}{% endgeneration %}{% else %}{{ message['content'] }}{% endif %}{{'<|im_end|>' + '\n'}}",
-            )
-        )
+        chat_template = update_chat_template(self.tokenizer.get_chat_template())
         chat = cast(
             str,
             self.tokenizer.apply_chat_template(
@@ -232,3 +215,50 @@ class TaskResultTokenizer:
             except IndexError:
                 pass
         return token_logprobs
+
+
+def update_chat_template(chat_template: str) -> str:
+    return (
+        chat_template
+        # Remove template logic that strips reasoning content from the chat messages
+        .replace(
+            "{% if '</think>' in content %}{% set content = content.split('</think>')[-1] %}{% endif %}",
+            "",
+        )
+        # Add generation tags for assistant token masking
+        .replace(
+            "{{'<｜Assistant｜>' + content + '<｜end▁of▁sentence｜>'}}",
+            "{{'<｜Assistant｜>'}}{% generation %}{{ content }}{% endgeneration %}{{'<｜end▁of▁sentence｜>'}}",
+        )
+        # Add generation tags for assistant token masking (for Hermes 2 Theta)
+        .replace(
+            "{{'<|im_start|>' + message['role'] + '\n' + message['content'] + '<|im_end|>' + '\n'}}",
+            "{{'<|im_start|>' + message['role'] + '\n'}}{% if message['role'] == 'assistant' %}{% generation %}{{ message['content'] }}{% endgeneration %}{% else %}{{ message['content'] }}{% endif %}{{'<|im_end|>' + '\n'}}",
+        )
+        # Add generation tags for assistant token masking (for Qwen 2.5 Instruct)
+        .replace(
+            """
+    {%- if (message.role == "user") or (message.role == "system" and not loop.first) or (message.role == "assistant" and not message.tool_calls) %}
+        {{- '<|im_start|>' + message.role + '\\n' + message.content + '<|im_end|>' + '\\n' }}
+    """.strip(),
+            """
+    {%- if (message.role == "user") or (message.role == "system" and not loop.first) %}
+        {{- '<|im_start|>' + message.role + '\\n' + message.content + '<|im_end|>' + '\\n' }}
+    {%- elif message.role == "assistant" and not message.tool_calls %}
+        {{- '<|im_start|>' + message.role + '\\n' }}{% generation %}{{ message.content }}{% endgeneration %}{{ '<|im_end|>' + '\\n' }}
+""".strip(),
+        ).replace(
+            """
+        {%- elif message.role == "assistant" %}
+        {{- '<|im_start|>' + message.role }}
+        {%- if message.content %}
+            {{- '\\n' + message.content }}
+        {%- endif %}""".strip(),
+            """
+        {%- elif message.role == "assistant" %}
+        {{- '<|im_start|>' + message.role }}
+        {%- if message.content %}
+            {{- '\\n' }}{% generation %}{{ message.content }}{% endgeneration %}
+        {%- endif %}""".strip(),
+        )
+    )
