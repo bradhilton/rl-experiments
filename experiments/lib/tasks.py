@@ -187,7 +187,7 @@ class TaskResultStats:
     pbar: tqdm.tqdm
     prices: tuple[float, float] | None
     completion_tokens: int = 0
-    exceptions: int = 0
+    exceptions: list[Exception] = field(default_factory=list)
     grades: int = 0
     new_completion_ids: set[str] = field(default_factory=set)
     new_completion_tokens: int = 0
@@ -236,7 +236,7 @@ class TaskResultStats:
                         self.total_metrics[key] = 0
                     self.total_metrics[key] += value
         elif exception:
-            self.exceptions += 1
+            self.exceptions.append(exception)
         postfix = {
             "completion_tokens": round(self.completion_tokens / max(self.usages, 1)),
             "prompt_tokens": round(self.prompt_tokens / max(self.usages, 1)),
@@ -254,5 +254,5 @@ class TaskResultStats:
         if self.token_logprobs:
             postfix["token_logprobs"] = self.token_logprobs
         if self.exceptions:
-            postfix["exceptions"] = self.exceptions
+            postfix["exceptions"] = len(self.exceptions)
         self.pbar.set_postfix(postfix)

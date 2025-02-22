@@ -1,4 +1,5 @@
 from dataclasses import dataclass, field
+import math
 from openai.types.chat.chat_completion import ChatCompletion, Choice
 from openai.types.chat.chat_completion_chunk import ChatCompletionChunk
 
@@ -28,8 +29,8 @@ def on_chunk(chunk: ChatCompletionChunk, completion: ChatCompletion) -> None:
 class InferenceEarlyStop:
     alpha: float = 0.992
     threshold: float = -3
-    log_early_stops: bool = True
-    log_last_n_characters: int = 100
+    log_early_stops: bool = False
+    log_last_n_characters: int = 64
     ewm_logprobs: dict[str, float] = field(default_factory=dict)
 
     def __call__(self, chunk: ChatCompletionChunk, completion: ChatCompletion) -> None:
@@ -41,6 +42,8 @@ class InferenceEarlyStop:
         ):
             return
         for token_logprob in chunk.choices[0].logprobs.content:
+            if token_logprob.logprob is None or math.isnan(token_logprob.logprob):
+                continue
             ewm_logprob = (
                 self.alpha * self.ewm_logprobs.get(completion.id, 0)
                 + (1 - self.alpha) * token_logprob.logprob
@@ -50,9 +53,10 @@ class InferenceEarlyStop:
                     print(
                         f"Early stopping - ewm_logprob: {ewm_logprob} completion_tokens: {len(completion.choices[0].logprobs.content)}"  # type: ignore
                     )
-                if self.log_last_n_characters:
-                    print(
-                        f"Early stop last {self.log_last_n_characters} characters: {completion.choices[0].message.content[-self.log_last_n_characters :]}"  # type: ignore
-                    )
+                    if self.log_last_n_characters:
+                        print(
+                            f"Last {self.log_last_n_characters} characters: {completion.choices[0].message.content[-self.log_last_n_characters :]}"  # type: ignore
+                        )
+                setattr(completion.choices[0], "early_stop", True)
                 raise StopIteration()
             self.ewm_logprobs[completion.id] = ewm_logprob
