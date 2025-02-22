@@ -32,19 +32,24 @@ def get_temporal_clue_tasks(surprise_bonus: float = 0.0) -> Iterable[Task]:
                     if match.strip().lower() == value.lower():
                         num_correct += 1
             reward = num_correct / len(puzzle["solution"])
-            if surprise_bonus != 0.0 and choice.logprobs:
-                if logprobs := [
-                    token_logprob.logprob
-                    for token_logprob in choice.logprobs.content
-                    or choice.logprobs.refusal
-                    or []
-                    if token_logprob.logprob is not None
-                    and not math.isnan(token_logprob.logprob)
-                ]:
-                    surprise = -sum(logprobs) / len(logprobs)
-                    return reward + surprise_bonus * surprise, dict(
-                        acc=reward, surprise=surprise
-                    )
+            if (
+                surprise_bonus > 0
+                and choice.logprobs
+                and (
+                    logprobs := [
+                        token_logprob.logprob
+                        for token_logprob in choice.logprobs.content
+                        or choice.logprobs.refusal
+                        or []
+                        if token_logprob.logprob is not None
+                        and not math.isnan(token_logprob.logprob)
+                    ]
+                )
+            ):
+                surprise = -sum(logprobs) / len(logprobs)
+                return (
+                    (1 - surprise_bonus) * reward + reward * surprise_bonus * surprise
+                ), dict(acc=reward, surprise=surprise)
             return reward
 
         yield Task(
