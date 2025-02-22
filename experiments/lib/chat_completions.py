@@ -10,7 +10,15 @@ from openai.types.chat.chat_completion import ChatCompletion
 from openai.types.chat.chat_completion_chunk import ChatCompletionChunk
 from openai.types.chat.completion_create_params import CompletionCreateParamsBase
 import os
-from typing import AsyncContextManager, Callable, Protocol, TypedDict, Unpack
+from typing import (
+    Any,
+    AsyncContextManager,
+    AsyncGenerator,
+    Callable,
+    Protocol,
+    TypedDict,
+    Unpack,
+)
 
 
 from .stream import consume_chat_completion_stream
@@ -71,14 +79,21 @@ class TokenScheduler(Protocol):
 
 
 class UnlimitedTokenScheduler(TokenScheduler):
-    def tokens(self, params: CreateParams) -> AsyncContextManager[int]:
-        return asynccontextmanager(lambda: (yield MAX_INT))()  # type: ignore
+    def tokens(self, _: CreateParams) -> AsyncContextManager[int]:
+        @asynccontextmanager
+        async def unlimited_tokens() -> AsyncGenerator[int, None]:
+            try:
+                yield MAX_INT
+            finally:
+                pass
+
+        return unlimited_tokens()
 
     def is_finished(
         self,
-        chat_completion: ChatCompletion,
-        params: CreateParams,
-        max_completion_tokens: int,
+        _: ChatCompletion,
+        __: CreateParams,
+        ___: int,
     ) -> bool:
         return True
 
