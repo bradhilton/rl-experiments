@@ -32,24 +32,32 @@ def get_temporal_clue_tasks(surprise_bonus: float = 0.0) -> Iterable[Task]:
                     if match.strip().lower() == value.lower():
                         num_correct += 1
             reward = num_correct / len(puzzle["solution"])
-            if (
-                surprise_bonus > 0
-                and choice.logprobs
-                and (
-                    logprobs := [
-                        token_logprob.logprob
-                        for token_logprob in choice.logprobs.content
-                        or choice.logprobs.refusal
-                        or []
-                        if token_logprob.logprob is not None
-                        and not math.isnan(token_logprob.logprob)
-                    ]
+            if surprise_bonus and choice.logprobs and choice.logprobs.content:
+                matches = list(
+                    re.finditer(
+                        rf"[{''.join(puzzle["solution"])}]\. ([A-Za-z \.:-]+)",
+                        b"".join(
+                            bytes(token_logprob.bytes or [])
+                            for token_logprob in choice.logprobs.content
+                        ).decode(),
+                    )
                 )
-            ):
-                surprise = -sum(logprobs) / len(logprobs)
-                return (
-                    (1 - surprise_bonus) * reward + reward * surprise_bonus * surprise
-                ), dict(acc=reward, surprise=surprise)
+                last_end_index = matches[-1].end()
+                logprobs = []
+                cumulative_length = 0
+                for token_logprob in choice.logprobs.content:
+                    token_text = bytes(token_logprob.bytes or []).decode()
+                    cumulative_length += len(token_text)
+                    if not math.isnan(token_logprob.logprob):
+                        logprobs.append(token_logprob.logprob)
+                    if cumulative_length >= last_end_index:
+                        break
+                if logprobs:
+                    surprise = -sum(logprobs) / len(logprobs)
+                    return (
+                        (1 - surprise_bonus) * reward
+                        + reward * surprise_bonus * surprise
+                    ), dict(acc=reward, surprise=surprise)
             return reward
 
         yield Task(
