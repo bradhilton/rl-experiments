@@ -10,7 +10,7 @@ from openai.types.completion_usage import CompletionUsage
 import random
 from typing import Awaitable, Callable, Never, TypeVar
 
-from .chat_completions import CreateParams, get_chat_completion
+from .chat_completions import CreateParams, get_chat_completion, TokenScheduler
 from .tqdm import tqdm
 
 
@@ -62,6 +62,7 @@ async def get_task_results(
     pbar_desc: str | None = None,
     prices: tuple[float, float] | None = None,
     semaphore: asyncio.Semaphore | None = None,
+    token_scheduler: TokenScheduler | None = None,
     transform: Callable[[TaskResult], T | Awaitable[T]] = lambda x: x,
 ) -> TaskResults[T]:
     num_completions = len(tasks) * n
@@ -89,6 +90,7 @@ async def get_task_results(
                     else None
                 ),
                 semaphore=semaphore,
+                token_scheduler=token_scheduler,
                 messages=task.messages,
                 model=model,
                 **_params,  # type: ignore

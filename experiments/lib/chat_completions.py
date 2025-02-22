@@ -6,9 +6,10 @@ import json
 import obstore
 from openai import AsyncOpenAI
 from openai._types import Body, Headers, Query
-from openai.types.chat.chat_completion import ChatCompletion
+from openai.types.chat.chat_completion import ChatCompletion, Choice, ChoiceLogprobs
 from openai.types.chat.chat_completion_chunk import ChatCompletionChunk
 from openai.types.chat.completion_create_params import CompletionCreateParamsBase
+from openai.types.completion_usage import CompletionUsage
 import os
 from typing import (
     Any,
@@ -234,33 +235,44 @@ async def _get_chat_completion(
         )
         extra_body["add_generation_prompt"] = False
         extra_body["continue_final_message"] = True
-    return _merged_chat_completions(
-        chat_completion,
-        await _get_chat_completion(
-            client,
-            create_params,
-            token_scheduler,
-            _on_chunk,
-        ),
+    new_completion = await _get_chat_completion(
+        client,
+        create_params,
+        token_scheduler,
+        _on_chunk,
     )
+    _merge_chat_completions(chat_completion, new_completion)
+    return new_completion
 
 
-def _merged_chat_completions(
+def _merge_chat_completions(
     original: ChatCompletion,
-    continuation: ChatCompletion,
-) -> ChatCompletion:
-    continuation = continuation.model_copy()
-    for choice, new_choice in zip(original.choices, continuation.choices):
-        if (
-            choice.logprobs
-            and choice.logprobs.content
-            and new_choice.logprobs
-            and new_choice.logprobs.content
-        ):
-            new_choice.logprobs.content = (
-                choice.logprobs.content + new_choice.logprobs.content
-            )
-    return continuation
+    into: ChatCompletion,
+) -> None:
+    for original_choice, into_choice in zip(original.choices, into.choices):
+        _merge_choices(original_choice, into_choice)
+    if original.usage and into.usage:
+        _merge_usage(original.usage, into.usage)
+
+
+def _merge_choices(original: Choice, into: Choice) -> None:
+    if original.logprobs and into.logprobs:
+        _merge_choice_logprobs(original.logprobs, into.logprobs)
+    if original.message.content and into.message.content:
+        into.message.content = original.message.content + into.message.content
+
+
+def _merge_choice_logprobs(original: ChoiceLogprobs, into: ChoiceLogprobs) -> None:
+    if original.content and into.content:
+        into.content = original.content + into.content
+    if original.refusal and into.refusal:
+        into.refusal = original.refusal + into.refusal
+
+
+def _merge_usage(original: CompletionUsage, into: CompletionUsage) -> None:
+    into.prompt_tokens = original.prompt_tokens
+    into.completion_tokens += original.completion_tokens
+    into.total_tokens = into.prompt_tokens + into.completion_tokens
 
 
 def is_valid_chat_completion(chat_completion: ChatCompletion) -> bool:
