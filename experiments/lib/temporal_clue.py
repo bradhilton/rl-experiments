@@ -32,6 +32,13 @@ def get_temporal_clue_tasks(surprise_bonus: float = 0.0) -> Iterable[Task]:
                     if match.strip().lower() == value.lower():
                         num_correct += 1
             reward = num_correct / len(puzzle["solution"])
+            early_stop = (
+                1
+                if choice.logprobs
+                and choice.logprobs.content
+                and not choice.logprobs.content[-1].bytes
+                else 0
+            )
             if surprise_bonus and choice.logprobs and choice.logprobs.content:
                 matches = list(
                     re.finditer(
@@ -42,6 +49,8 @@ def get_temporal_clue_tasks(surprise_bonus: float = 0.0) -> Iterable[Task]:
                         ).decode(),
                     )
                 )
+                if not matches:
+                    return reward
                 last_end_index = matches[-1].end()
                 logprobs = []
                 cumulative_length = 0
@@ -57,8 +66,8 @@ def get_temporal_clue_tasks(surprise_bonus: float = 0.0) -> Iterable[Task]:
                     return (
                         (1 - surprise_bonus) * reward
                         + reward * surprise_bonus * surprise
-                    ), dict(acc=reward, surprise=surprise)
-            return reward
+                    ), dict(acc=reward, early_stop=early_stop, surprise=surprise)
+            return reward, dict(acc=reward, early_stop=early_stop)
 
         yield Task(
             messages=[

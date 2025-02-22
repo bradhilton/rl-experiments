@@ -65,7 +65,7 @@ class TaskResultTokenizer:
             self._tokenized_result(
                 task_result,
                 choice,
-                task_result.advantages[(chat_completion.id, choice.index)],
+                task_result.advantages.get((chat_completion.id, choice.index), 0),
             )
             for chat_completion in chat_completions
             for choice in chat_completion.choices

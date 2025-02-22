@@ -97,6 +97,10 @@ async def consume_chat_completion_stream(
         chat_completion.system_fingerprint = chunk.system_fingerprint
         chat_completion.usage = chunk.usage
         if on_chunk:
-            on_chunk(chunk, chat_completion)
+            try:
+                on_chunk(chunk, chat_completion)
+            except StopIteration:
+                await stream.close()
+                break
     assert chat_completion is not None
     return chat_completion

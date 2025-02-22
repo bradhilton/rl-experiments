@@ -15,8 +15,8 @@ from .tqdm import tqdm
 
 
 class ChatCompletionParams(CreateParams, total=False):
-    messages: Never
-    model: Never
+    messages: Never  # type: ignore
+    model: Never  # type: ignore
 
 
 # A grader function returns a floating-point reward,
@@ -58,6 +58,7 @@ async def get_task_results(
     log_results: bool | float | int = True,
     log_token_logprobs: bool = True,
     n: int = 1,
+    on_chunk: Callable[[ChatCompletionChunk, ChatCompletion], None] | None = None,
     params: ChatCompletionParams | None = None,
     pbar_desc: str | None = None,
     prices: tuple[float, float] | None = None,
@@ -68,6 +69,17 @@ async def get_task_results(
     num_completions = len(tasks) * n
     pbar = tqdm.tqdm(total=num_completions, desc=pbar_desc)
     stats = TaskResultStats(pbar=pbar, prices=prices)
+
+    if log_token_logprobs or on_chunk:
+
+        def _on_chunk(chunk: ChatCompletionChunk, completion: ChatCompletion) -> None:
+            if log_token_logprobs:
+                stats.update(id=chunk.id, chunk=chunk)
+            if on_chunk:
+                on_chunk(chunk, completion)
+
+    else:
+        _on_chunk = None  # type: ignore
 
     async def get_task_result(
         task: Task, client: AsyncOpenAI, model: str, log_results: bool
@@ -84,11 +96,7 @@ async def get_task_results(
                 client,
                 cache=cache,
                 log_results=log_results and i == 0,
-                on_chunk=(
-                    (lambda chunk, _: stats.update(id=chunk.id, chunk=chunk))
-                    if log_token_logprobs
-                    else None
-                ),
+                on_chunk=_on_chunk,
                 semaphore=semaphore,
                 token_scheduler=token_scheduler,
                 messages=task.messages,
