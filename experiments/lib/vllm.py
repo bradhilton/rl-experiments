@@ -107,7 +107,7 @@ async def start_vllm(
                 max_connections=max_concurrent_requests,
                 max_keepalive_connections=max_concurrent_requests,
             ),
-            timeout=httpx.Timeout(timeout=600, connect=10.0),
+            timeout=httpx.Timeout(timeout=1_200, connect=10.0),
         ),
     )
     start = asyncio.get_event_loop().time()
