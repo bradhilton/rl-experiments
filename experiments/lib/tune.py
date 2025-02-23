@@ -141,7 +141,20 @@ async def tune(
             torchrun_kwargs={"nproc_per_node": torch.cuda.device_count()},
             tune_run_env={"CUDA_LAUNCH_BLOCKING": "1"},
         )
-    return _save_last_checkpoint_files(base_checkpoint_dir, output_dir)
+    epoch_dirs = lambda: glob.glob(f"{output_dir}/epoch_*")
+    epoch_dir = max(
+        epoch_dirs(),
+        key=lambda x: int(x.split("_")[-1]),
+        default=None,
+    )
+    assert (
+        epoch_dir is not None
+    ), f"No epoch directory found in output directory {output_dir}"
+    iteration_dir = f"{output_dir}/{get_iteration(output_dir) + 1:04d}"
+    os.rename(epoch_dir, iteration_dir)
+    for epoch_dir in epoch_dirs():
+        os.rmdir(epoch_dir)
+    return iteration_dir
 
 
 def _get_checkpointer_config(

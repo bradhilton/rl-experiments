@@ -1323,6 +1323,9 @@ wheels = [
 cli = [
     { name = "inquirerpy" },
 ]
+hf-transfer = [
+    { name = "hf-transfer" },
+]
 
 [[package]]
 name = "idna"
@@ -1586,6 +1589,21 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/59/73/fa26bbb747a9ea4fca6b01453aa22990d52ab62dd61384f1ac0dc9d4e7ba/jupyterlab_widgets-3.0.13.tar.gz", hash = "sha256:a2966d385328c1942b683a8cd96b89b8dd82c8b8f81dda902bb2bc06d46f5bed", size = 203556 }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/a9/93/858e87edc634d628e5d752ba944c2833133a28fa87bb093e6832ced36a3e/jupyterlab_widgets-3.0.13-py3-none-any.whl", hash = "sha256:e3cda2c233ce144192f1e29914ad522b2f4c40e77214b0cc97377ca3d323db54", size = 214392 },
+]
+
+[[package]]
+name = "kagglehub"
+version = "0.3.9"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "packaging" },
+    { name = "pyyaml" },
+    { name = "requests" },
+    { name = "tqdm" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/8e/b9/22339ce8097769aadcd9dbac993e8df0829d7ec974c65734ad87c8284fd8/kagglehub-0.3.9.tar.gz", hash = "sha256:3f83e6044536655bf7f6b61fa92dc6bad60ebecce6212d4e825a3e17fe6f675d", size = 105716 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/d0/2f/43f29ea787d1144cc2dc3994388fc3f2645fa6e14671af14447476b0bf89/kagglehub-0.3.9-py3-none-any.whl", hash = "sha256:895c6aadab6ab3c6b10b782256fb598ec7c25c8fb7852b3852b6382a84ed89e7", size = 62671 },
 ]
 
 [[package]]
@@ -2319,7 +2337,7 @@ requires-dist = [
     { name = "skypilot", extras = ["cudo", "do", "gcp", "lambda", "runpod"], git = "https://github.com/skypilot-org/skypilot?rev=9d8d7c6f6bc5482bd10c4c0f548786012c0a9b18" },
     { name = "torch", specifier = ">=2.5.1" },
     { name = "torchao", specifier = ">=0.8.0" },
-    { name = "torchtune", git = "https://github.com/pytorch/torchtune?rev=4b6877a6ef31a1f987c27594eaf8fe467b5ab785" },
+    { name = "torchtune", specifier = ">=0.5.0" },
     { name = "vllm", specifier = ">=0.7.0" },
     { name = "wandb", specifier = ">=0.19.6" },
 ]
@@ -3925,12 +3943,13 @@ wheels = [
 
 [[package]]
 name = "torchtune"
-version = "0.0.0"
-source = { git = "https://github.com/pytorch/torchtune?rev=4b6877a6ef31a1f987c27594eaf8fe467b5ab785#4b6877a6ef31a1f987c27594eaf8fe467b5ab785" }
+version = "0.5.0"
+source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "blobfile" },
     { name = "datasets" },
-    { name = "huggingface-hub" },
+    { name = "huggingface-hub", extra = ["hf-transfer"] },
+    { name = "kagglehub" },
     { name = "numpy" },
     { name = "omegaconf" },
     { name = "pillow" },
@@ -3939,6 +3958,9 @@ dependencies = [
     { name = "sentencepiece" },
     { name = "tiktoken" },
     { name = "tqdm" },
+]
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/3e/75/76bc4f7d48da0ee3c29233df873883c463d6d9382fcaeb4fe6e859393a04/torchtune-0.5.0-py3-none-any.whl", hash = "sha256:4b16e6a0b97f1c50455510cbf869628f50f3c72147277af3b791718212ada25c", size = 810331 },
 ]
 
 [[package]]
