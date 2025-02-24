@@ -6,6 +6,7 @@ from torchtune.models.qwen2_5 import (
     qwen2_5_14b_instruct,
     qwen2_5_32b_base,
     qwen2_5_32b_instruct,
+    qwen2_5_72b_instruct,
 )
 from torchtune.models.llama3_1 import llama3_1_8b, llama3_1_70b
 from torchtune.modules import TransformerDecoder
@@ -137,4 +138,18 @@ def distilled_llama_70b() -> Model:
         tune_optimizer="torch.optim.AdamW",
         vllm_named_arguments={},
         tune_fsdp_cpu_offload=True,
+    )
+
+
+def qwen_72b() -> Model:
+    assert torch.cuda.device_count() >= 8, "Qwen-72B requires at least 8 GPUs"
+    return Model(
+        base_model="Qwen/Qwen2.5-72B-Instruct",
+        tune_model=qwen2_5_72b_instruct,
+        tune_model_type="QWEN2",
+        tune_max_batch_tokens=32768,
+        tune_optimizer="torch.optim.AdamW",
+        vllm_named_arguments={},
+        tune_fsdp_cpu_offload=True,
+        tune_num_output_chunks=2,
     )
