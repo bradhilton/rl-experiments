@@ -400,8 +400,7 @@ setup: |
   # Sync the dependencies
   uv sync
   # Unfortunate workaround because of a cli tool naming conflict
-  # Also this revision is known to work with our recipe
   uv remove torchtune
-  uv add git+https://github.com/pytorch/torchtune --rev 4b6877a6ef31a1f987c27594eaf8fe467b5ab785
+  uv add torchtune
   # Move ./.gcloud.json to ~/.gcloud.json
   mv ./.gcloud.json ~/.gcloud.json
