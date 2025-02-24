@@ -46,19 +46,19 @@ def symlink_shm(relative_path: str) -> str | None:
     return shm_dir.as_posix()
 
 
-async def rsync_dir(relative_path: str, destination: str) -> None:
+async def rsync_dir(
+    relative_path: str, destination: str, destination_subpath: str = ""
+) -> None:
     abs_path = Path(relative_path).absolute().as_posix()
-    destination = (
-        Path(destination)
-        .joinpath(*Path(relative_path).parts)
-        .as_posix()
-        .replace("gs:/", "gs://")
-    )
+    if destination_subpath:
+        destination = Path(destination).joinpath(destination_subpath).as_posix()
+    else:
+        destination = Path(destination).joinpath(*Path(relative_path).parts).as_posix()
     print(f"rsyncing {abs_path} to {destination}")
     os.makedirs("./logs", exist_ok=True)
     with open("./logs/rsync.log", "w") as log_file:
         process = await asyncio.create_subprocess_shell(
-            f"gsutil -m rsync -r -d {abs_path} {destination}",
+            f"gsutil -m rsync -r -d {abs_path} {destination.replace("gs:/", "gs://")}",
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
         )
