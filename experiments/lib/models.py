@@ -113,6 +113,20 @@ def distilled_qwen_32b() -> Model:
     )
 
 
+def llama_70b() -> Model:
+    assert torch.cuda.device_count() >= 8, "Llama-70B requires at least 8 GPUs"
+    return Model(
+        base_model="unsloth/Llama-3.3-70B-Instruct",
+        tune_model=llama3_1_70b,
+        tune_model_type="LLAMA3",
+        tune_max_batch_tokens=65536,
+        tune_optimizer="torch.optim.AdamW",
+        vllm_named_arguments={},
+        tune_fsdp_cpu_offload=True,
+        tune_num_output_chunks=2,
+    )
+
+
 def distilled_llama_70b() -> Model:
     assert torch.cuda.device_count() >= 8, "Llama-70B requires at least 8 GPUs"
     return Model(
