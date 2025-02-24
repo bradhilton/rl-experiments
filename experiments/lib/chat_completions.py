@@ -84,7 +84,7 @@ class UnlimitedTokenScheduler(TokenScheduler):
         @asynccontextmanager
         async def unlimited_tokens() -> AsyncGenerator[int, None]:
             try:
-                yield MAX_INT
+                yield 0
             finally:
                 pass
 
@@ -197,13 +197,17 @@ async def _get_chat_completion(
     create_params = create_params.copy()
     async with token_scheduler.tokens(create_params) as max_completion_tokens:
         _create_params = create_params.copy()
-        _create_params["max_completion_tokens"] = _create_params["max_tokens"] = min(
-            _create_params.get(
-                "max_completion_tokens", _create_params.get("max_tokens", MAX_INT)
+        if max_completion_tokens:
+            _create_params["max_completion_tokens"] = _create_params["max_tokens"] = (
+                min(
+                    _create_params.get(
+                        "max_completion_tokens",
+                        _create_params.get("max_tokens", MAX_INT),
+                    )
+                    or MAX_INT,
+                    max_completion_tokens,
+                )
             )
-            or MAX_INT,
-            max_completion_tokens,
-        )
         if _on_chunk:
             stream = await client.chat.completions.create(**_create_params, stream=True)
             chat_completion = await consume_chat_completion_stream(
