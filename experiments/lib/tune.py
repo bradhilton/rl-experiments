@@ -139,7 +139,7 @@ async def tune(
             total=disk_packed_tensors["num_sequences"],
             verbosity=verbosity,
             torchrun_kwargs={"nproc_per_node": torch.cuda.device_count()},
-            tune_run_env={"CUDA_LAUNCH_BLOCKING": "1"},
+            # tune_run_env={"CUDA_LAUNCH_BLOCKING": "1"},
         )
     epoch_dirs = lambda: glob.glob(f"{output_dir}/epoch_*")
     epoch_dir = max(
