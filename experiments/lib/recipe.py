@@ -128,6 +128,7 @@ class TuneRecipeConfig(DictConfig):
         fsdp_cpu_offload: Optional[bool] = None,
         log_every_n_steps: Optional[int] = None,
         log_peak_memory_stats: Optional[bool] = None,
+        log_grad_magnitude: Optional[bool] = None,
         optimizer_in_bwd: Optional[bool] = None,
         clip_grad_norm: Optional[Union[str, float]] = None,
         enable_activation_checkpointing: Optional[bool] = None,
@@ -164,6 +165,8 @@ class TuneRecipeConfig(DictConfig):
             self.log_every_n_steps = log_every_n_steps
         if log_peak_memory_stats is not None:
             self.log_peak_memory_stats = log_peak_memory_stats
+        if log_grad_magnitude is not None:
+            self.log_grad_magnitude = log_grad_magnitude
         if optimizer_in_bwd is not None:
             self.optimizer_in_bwd = optimizer_in_bwd
         if clip_grad_norm is not None:
@@ -325,6 +328,7 @@ class TuneRecipe(FTRecipeInterface):
         # logging attributes
         self._log_every_n_steps: int = cfg.get("log_every_n_steps", 1)
         self._log_peak_memory_stats: bool = cfg.get("log_peak_memory_stats", False)
+        self._log_grad_magnitude: bool = cfg.get("log_grad_magnitude", False)
 
         if self._log_peak_memory_stats and self._device.type != "cuda":
             log.info(
@@ -1171,6 +1175,20 @@ class TuneRecipe(FTRecipeInterface):
                                 torch.distributed.all_reduce(tensor)
                         # Manually scale the gradients from unnormalized loss by total # of tokens
                         training.scale_grads(self._model, 1 / running_result.num_tokens)
+
+                        # Calculate gradient magnitude (L2 norm of all gradients)
+                        grad_magnitude = None
+                        if self._log_grad_magnitude:
+                            grad_magnitude = torch.norm(
+                                torch.stack(
+                                    [
+                                        torch.norm(p.grad.detach())
+                                        for p in self._model.parameters()
+                                        if p.grad is not None
+                                    ]
+                                )
+                            )
+
                         if self._clip_grad_norm is not None:
                             grad_norm = torch.nn.utils.clip_grad_norm_(
                                 self._model.parameters(),
@@ -1191,13 +1209,15 @@ class TuneRecipe(FTRecipeInterface):
                     pbar.set_description(
                         f"{curr_epoch + 1}|{self.global_step}|Loss: {loss_to_log:.4f}"
                     )
-                    pbar.set_postfix(
-                        # lr=get_lr(self._optimizer or self._optim_ckpt_wrapper),
-                        loss=loss_to_log,
-                        policy=policy_loss_to_log,
-                        entropy=entropy_to_log,
-                        kl_div=kl_div_to_log,
-                    )
+                    postfix = {
+                        "loss": loss_to_log,
+                        "policy": policy_loss_to_log,
+                        "entropy": entropy_to_log,
+                        "kl_div": kl_div_to_log,
+                    }
+                    if self._log_grad_magnitude and grad_magnitude is not None:
+                        postfix["grad_magnitude"] = grad_magnitude.item()
+                    pbar.set_postfix(postfix)
 
                     # Log per-step metrics
                     if (
@@ -1214,6 +1234,8 @@ class TuneRecipe(FTRecipeInterface):
                             "tokens_per_second_per_gpu": running_result.num_tokens
                             / (time_per_step * world_size),
                         }
+                        if self._log_grad_magnitude and grad_magnitude is not None:
+                            log_dict["grad_magnitude"] = grad_magnitude.item()
                         if self._log_peak_memory_stats:
                             log_dict.update(
                                 training.get_memory_stats(device=self._device)
