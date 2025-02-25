@@ -109,6 +109,7 @@ class GRPO(torch.nn.Module):
         reference_logprobs: torch.Tensor | None,
         mask: torch.Tensor,
         weights: torch.Tensor,
+        deferred: torch.Tensor,
         bos_id: int,
     ) -> GRPOResult:
         """
@@ -137,6 +138,9 @@ class GRPO(torch.nn.Module):
             weights (Tensor):
                 Shape: (batch_size, sequence_length)
                 Weights for each token.
+            deferred (Tensor):
+                Shape: (batch_size, sequence_length)
+                Boolean mask specifying whether the token was deferred from a previous iteration.
             bos_id (int):
                 Index of the beginning of sequence token in the vocabulary.
 
@@ -158,6 +162,7 @@ class GRPO(torch.nn.Module):
                 ),
                 mask.chunk(num_chunks, dim=1),
                 weights.chunk(num_chunks, dim=1),
+                deferred.chunk(num_chunks, dim=1),
             ):
                 result += self._forward_chunk(*chunked_args, bos_id=bos_id)
             return result
@@ -170,6 +175,7 @@ class GRPO(torch.nn.Module):
             reference_logprobs,
             mask,
             weights,
+            deferred,
             bos_id,
         )
 
@@ -182,6 +188,7 @@ class GRPO(torch.nn.Module):
         reference_logprobs: torch.Tensor | None,
         mask: torch.Tensor,
         weights: torch.Tensor,
+        deferred: torch.Tensor,
         bos_id: int,
     ) -> GRPOResult:
         """
@@ -200,6 +207,9 @@ class GRPO(torch.nn.Module):
             reference_logprobs = shift_tensor(reference_logprobs, 0).view(-1)
         mask = shift_tensor(mask, False).view(-1)  # (batch_size * sequence_length,)
         weights = shift_tensor(weights, 0).view(-1)  # (batch_size * sequence_length,)
+        deferred = shift_tensor(deferred, False).view(
+            -1
+        )  # (batch_size * sequence_length,)
         num_tokens = mask.sum()
         dist = torch.distributions.Categorical(logits=logits)
         entropy = dist.entropy()[mask]
@@ -209,10 +219,16 @@ class GRPO(torch.nn.Module):
         if reference_logprobs is not None:
             reference_logprobs = reference_logprobs[mask]
         advantages = advantages[mask]
+        diff = new_logprobs - logprobs
+        if deferred.any():
+            deferred = deferred[mask]
+            normalized_diff = diff / diff[deferred].std()
+            advantages = torch.where(deferred, advantages * normalized_diff, advantages)
+            diff = torch.where(deferred, new_logprobs - new_logprobs.detach(), diff)
         if self.tanh:
-            policy_loss = -torch.tanh(new_logprobs - logprobs).mul(advantages)
+            policy_loss = -torch.tanh(diff).mul(advantages)
         else:
-            prob_ratio = torch.exp(new_logprobs - logprobs)
+            prob_ratio = torch.exp(diff)
             policy_loss = -torch.min(
                 prob_ratio * advantages,
                 torch.clip(prob_ratio, 1 - self.clip_epsilon, 1 + self.clip_epsilon)

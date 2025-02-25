@@ -13,7 +13,9 @@ from .tasks import TaskResult
 @dataclass
 class TokenizedResult:
     conversation: list
+    reward: float
     advantage: float
+    deferred: bool
     chat_template: str
     chat: str
     tokens: list[str]
@@ -29,6 +31,8 @@ class TokenizedResult:
         return TokenizedResult(
             conversation=self.conversation,
             advantage=self.advantage,
+            reward=self.reward,
+            deferred=self.deferred,
             chat_template=self.chat_template,
             chat=self.chat,
             tokens=self.tokens[self.prompt_length :],
@@ -65,6 +69,7 @@ class TaskResultTokenizer:
             self._tokenized_result(
                 task_result,
                 choice,
+                task_result.rewards.get((chat_completion.id, choice.index), 0),
                 task_result.advantages.get((chat_completion.id, choice.index), 0),
             )
             for chat_completion in chat_completions
@@ -87,7 +92,7 @@ class TaskResultTokenizer:
         return tokenized_results
 
     def _tokenized_result(
-        self, task_result: TaskResult, choice: Choice, advantage: float
+        self, task_result: TaskResult, choice: Choice, reward: float, advantage: float
     ) -> TokenizedResult:
         conversation: list = task_result.task.messages + [
             {
@@ -146,7 +151,9 @@ class TaskResultTokenizer:
             )
         return TokenizedResult(
             conversation=conversation,
+            reward=reward,
             advantage=advantage,
+            deferred=False,
             chat_template=chat_template,
             chat=chat,
             tokens=tokens,

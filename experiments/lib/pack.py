@@ -18,6 +18,7 @@ class PackedTensors(TypedDict):
     logprobs: torch.Tensor
     advantages: torch.Tensor
     weights: torch.Tensor
+    deferred: torch.Tensor
 
 
 class DiskPackedTensors(TypedDict):
@@ -51,6 +52,8 @@ def packed_tensors_from_tokenized_results(
     logprobs: list[list[float]] = [[]]
     advantages: list[list[float]] = [[]]
     weights: list[list[float]] = [[]]
+    deferred: list[list[bool]] = [[]]
+
     for result in tokenized_results:
         if len(result.token_ids) > seq_len and not truncate_long_results:
             print("Result is too long, skipping")
@@ -76,6 +79,7 @@ def packed_tensors_from_tokenized_results(
             logprobs.append([])
             advantages.append([])
             weights.append([])
+            deferred.append([])
         group_id = random.randint(-(2**63), 2**63 - 1)
         if result.prompt_id in group_ids[-1]:
             result = result_without_prompt
@@ -105,6 +109,7 @@ def packed_tensors_from_tokenized_results(
         # prevent the model unlearning when to stop
         advantages[-1][-1] = max(0, advantages[-1][-1])
         weights[-1].extend([1 / sum(result.assistant_mask)] * len(result.token_ids))
+        deferred[-1].extend([result.deferred] * len(result.token_ids))
         if truncate_long_results:
             token_ids[-1] = token_ids[-1][:seq_len]
             group_ids[-1] = group_ids[-1][:seq_len]
@@ -114,6 +119,7 @@ def packed_tensors_from_tokenized_results(
             logprobs[-1] = logprobs[-1][:seq_len]
             advantages[-1] = advantages[-1][:seq_len]
             weights[-1] = weights[-1][:seq_len]
+            deferred[-1] = deferred[-1][:seq_len]
 
     def pad(values: list[list], pad_value) -> list[list]:
         max_len = seq_len
@@ -139,6 +145,7 @@ def packed_tensors_from_tokenized_results(
         "logprobs": torch.tensor(pad(logprobs, float("nan"))),
         "advantages": torch.tensor(pad(advantages, 0.0)),
         "weights": weights_tensor,
+        "deferred": torch.tensor(pad(deferred, False)),
     }
 
 
@@ -164,6 +171,7 @@ def packed_tensors_from_dir(**kwargs: Unpack[DiskPackedTensors]) -> PackedTensor
             "logprobs": torch.float32,
             "advantages": torch.float32,
             "weights": torch.float32,
+            "deferred": torch.bool,
         }.items()
     }  # type: ignore
 
