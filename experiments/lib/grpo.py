@@ -220,8 +220,8 @@ class GRPO(torch.nn.Module):
             reference_logprobs = reference_logprobs[mask]
         advantages = advantages[mask]
         diff = new_logprobs - logprobs
+        deferred = deferred[mask]
         if deferred.any():
-            deferred = deferred[mask]
             # Anywhere deferred is true, logprobs are from a previous iteration
             # We can scale the standard GRPO advantages by normalized logprob differences
             # to get a better, token-level estimate of the advantage
