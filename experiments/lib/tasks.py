@@ -88,6 +88,8 @@ async def get_task_results(
         _params = (params or {}).copy()
         if "logprobs" not in _params:
             _params["logprobs"] = True
+        elif _params["logprobs"] is None:
+            del _params["logprobs"]
         chat_completions: list[ChatCompletion] = []
         rewards: dict[tuple[str, int], float] = {}
         metrics: dict[tuple[str, int], dict[str, float]] = {}
