@@ -162,6 +162,7 @@ async def get_chat_completion(
                 return chat_completion
     async with semaphore or asyncio.Semaphore():
         if log_results or on_chunk:
+            os.makedirs(log_dir or chat_completion_logs_dir, exist_ok=True)
             log_file = os.path.join(
                 log_dir or chat_completion_logs_dir, f"{datetime.now().isoformat()}.log"
             )
