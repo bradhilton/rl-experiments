@@ -108,6 +108,25 @@ async def get_chat_completion(
     token_scheduler: TokenScheduler | None = None,
     **create_params: Unpack[CreateParams],
 ) -> ChatCompletion:
+    """
+    Given a client and arguments to openai.chat.completions.create, this function will return a chat completion with some additional features:
+    - Caching of results to object storage
+    - Logging of results to a file
+    - Streaming of results to the callback function
+    - Support for capping concurrent requests with a semaphore
+    - Advanced support for token scheduling and breaking up long completions
+
+    Args:
+        client (AsyncOpenAI): An AsyncOpenAI client
+        cache (bool): Whether to cache the results of the chat completion
+        log_results (bool): Whether to log the results of the chat completion
+        on_chunk (Callable[[ChatCompletionChunk, ChatCompletion], None]): A callback function that will be called with each chunk of the chat completion
+        semaphore (asyncio.Semaphore): A semaphore to limit the number of concurrent requests
+        token_scheduler (TokenScheduler): A token scheduler to limit the number of tokens used in the completion
+
+    Returns:
+        ChatCompletion: A chat completion
+    """
     request = ChatCompletionRequest(
         client_params=ClientParams(
             base_url=str(client.base_url),
