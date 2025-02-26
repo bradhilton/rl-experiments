@@ -102,6 +102,7 @@ class UnlimitedTokenScheduler(TokenScheduler):
 async def get_chat_completion(
     client: AsyncOpenAI,
     cache: bool = True,
+    log_dir: str | None = None,
     log_results: bool = True,
     on_chunk: Callable[[ChatCompletionChunk, ChatCompletion], None] | None = None,
     semaphore: asyncio.Semaphore | None = None,
@@ -119,6 +120,7 @@ async def get_chat_completion(
     Args:
         client (AsyncOpenAI): An AsyncOpenAI client
         cache (bool): Whether to cache the results of the chat completion
+        log_dir (str | None): The directory to log the results of the chat completion
         log_results (bool): Whether to log the results of the chat completion
         on_chunk (Callable[[ChatCompletionChunk, ChatCompletion], None]): A callback function that will be called with each chunk of the chat completion
         semaphore (asyncio.Semaphore): A semaphore to limit the number of concurrent requests
@@ -161,7 +163,7 @@ async def get_chat_completion(
     async with semaphore or asyncio.Semaphore():
         if log_results or on_chunk:
             log_file = os.path.join(
-                chat_completion_logs_dir, f"{datetime.now().isoformat()}.log"
+                log_dir or chat_completion_logs_dir, f"{datetime.now().isoformat()}.log"
             )
             if log_results:
                 with open(log_file, "w") as f:

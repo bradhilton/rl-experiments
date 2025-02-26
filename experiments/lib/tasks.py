@@ -55,6 +55,7 @@ async def get_task_results(
     cache: bool = True,
     clear_pbar: bool = False,
     print_pbar: bool = True,
+    log_dir: str | None = None,
     log_results: bool | float | int = True,
     log_token_logprobs: bool = True,
     n: int = 1,
@@ -95,6 +96,7 @@ async def get_task_results(
             get_chat_completion(
                 client,
                 cache=cache,
+                log_dir=log_dir,
                 log_results=log_results and i == 0,
                 on_chunk=_on_chunk,
                 semaphore=semaphore,
