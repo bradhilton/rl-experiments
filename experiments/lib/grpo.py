@@ -228,7 +228,7 @@ class GRPO(torch.nn.Module):
             normalized_diff = diff / (diff[deferred].std() + 1e-6)
             modified_advantages = advantages * normalized_diff
             # modified_advantages = (
-            #     modified_advantages.abs().sqrt() * modified_advantages.sign()
+            #     modified_advantages.abs().add(1e-6).sqrt() * modified_advantages.sign()
             # )
             advantages = torch.where(deferred, modified_advantages, advantages)
             diff = torch.where(deferred, new_logprobs - new_logprobs.detach(), diff)

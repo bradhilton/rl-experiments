@@ -1593,7 +1593,7 @@ wheels = [
 
 [[package]]
 name = "kagglehub"
-version = "0.3.9"
+version = "0.3.10"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "packaging" },
@@ -1601,9 +1601,9 @@ dependencies = [
     { name = "requests" },
     { name = "tqdm" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/8e/b9/22339ce8097769aadcd9dbac993e8df0829d7ec974c65734ad87c8284fd8/kagglehub-0.3.9.tar.gz", hash = "sha256:3f83e6044536655bf7f6b61fa92dc6bad60ebecce6212d4e825a3e17fe6f675d", size = 105716 }
+sdist = { url = "https://files.pythonhosted.org/packages/c0/b6/598259f1b5af7d0ad31f479080da4e8c533c189eb0cf072cb70ab8d75869/kagglehub-0.3.10.tar.gz", hash = "sha256:7df4238eea20817bce13bfacbe79ff4c0a583a9e876bfaf16d7ad6179611fb7c", size = 106415 }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/d0/2f/43f29ea787d1144cc2dc3994388fc3f2645fa6e14671af14447476b0bf89/kagglehub-0.3.9-py3-none-any.whl", hash = "sha256:895c6aadab6ab3c6b10b782256fb598ec7c25c8fb7852b3852b6382a84ed89e7", size = 62671 },
+    { url = "https://files.pythonhosted.org/packages/41/f5/d1fb003b997cccda7e7567e9768ab1ad5f4be014875773299c67c62b3b96/kagglehub-0.3.10-py3-none-any.whl", hash = "sha256:82a204e77919da54021038971ed735450c91ea479c5c003d140a22503bc20981", size = 63039 },
 ]
 
 [[package]]
