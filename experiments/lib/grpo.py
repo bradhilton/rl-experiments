@@ -226,7 +226,11 @@ class GRPO(torch.nn.Module):
             # We can scale the standard GRPO advantages by normalized logprob differences
             # to get a better, token-level estimate of the advantage
             normalized_diff = diff / (diff[deferred].std() + 1e-6)
-            advantages = torch.where(deferred, advantages * normalized_diff, advantages)
+            modified_advantages = advantages * normalized_diff
+            # modified_advantages = (
+            #     modified_advantages.abs().sqrt() * modified_advantages.sign()
+            # )
+            advantages = torch.where(deferred, modified_advantages, advantages)
             diff = torch.where(deferred, new_logprobs - new_logprobs.detach(), diff)
         if self.tanh:
             policy_loss = -torch.tanh(diff).mul(advantages)
