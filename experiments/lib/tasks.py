@@ -22,12 +22,32 @@ Grader = Callable[[Choice], Grade | Awaitable[Grade]]
 
 @dataclass
 class Task:
+    """
+    A minimal task definition.
+
+    Args:
+        messages (list[ChatCompletionMessageParam]): OpenAI API compatible chat messages for prompting the model
+        grader (Grader): A grader function to score the model's responses
+    """
+
     messages: list[ChatCompletionMessageParam]
     grader: Grader
 
 
 @dataclass
 class TaskResult:
+    """
+    A single task result.
+
+    Args:
+        task (Task): The task that was graded
+        chat_completions (list[ChatCompletion]): The chat completions generated for the task
+        rewards (dict[tuple[str, int], float]): Rewards for each chat completion and choice index
+        metrics (dict[tuple[str, int], dict[str, float]]): Metrics for each chat completion and choice index
+        advantages (dict[tuple[str, int], float]): GRPO advantages for each chat completion and choice index
+        exceptions (list[Exception]): Exceptions that occurred while getting the task result
+    """
+
     task: Task
     chat_completions: list[ChatCompletion]
     rewards: dict[tuple[str, int], float]
@@ -38,6 +58,25 @@ class TaskResult:
 
 @dataclass
 class TaskResultStats:
+    """
+    Statistics for task results.
+
+    Args:
+        pbar (tqdm.tqdm): The progress bar
+        prices (tuple[float, float] | None): Prices for input/output tokens
+        completion_tokens (int): Total completion tokens
+        exceptions (list[Exception]): Exceptions that occurred while getting the task results
+        grades (int): Number of grades
+        new_completion_ids (set[str]): Set of new completion IDs
+        new_completion_tokens (int): Total new completion tokens
+        new_prompt_tokens (int): Total new prompt tokens
+        prompt_tokens (int): Total prompt tokens
+        token_logprobs (int): Total token log probabilities
+        total_metrics (dict[str, float]): Total metrics
+        total_reward (float): Total reward
+        usages (int): Total usages
+    """
+
     pbar: tqdm.tqdm
     prices: tuple[float, float] | None
     completion_tokens: int = 0
@@ -138,29 +177,37 @@ async def get_task_results(
     token_scheduler: TokenScheduler | None = None,
     transform: Callable[[TaskResult], T | Awaitable[T]] = lambda x: x,
 ) -> TaskResults[T]:
+    """
+    Returns results for tasks using an AsyncOpenAI client for a given model. Includes support for caching, rate limiting, and logging. Results may be optionally transformed.
+
+    Args:
+        tasks (list[Task]): List of Task objects, each containing messages to send to the LLM and a grader function
+        client (AsyncOpenAI): Any valid AsyncOpenAI client that supports creating chat completions (may be pointed at API providers other than OpenAI or a local inference engine like vLLM)
+        model (str): Name of the chat completion model to use
+        cache (bool): Whether to cache completion results for later reuse
+        clear_pbar (bool): Whether to clear the progress bar after completion
+        print_pbar (bool): Whether to print the progress bar summary after completion
+        log_dir (str | None): Directory to save completion logs to. If None, will use the default chat completion log directory
+        log_results (bool | float | int): Controls which task results to log. Can be a boolean, float (fraction), or int (count)
+        log_token_logprobs (bool): Whether to stream token log probabilities count to the progress bar
+        n (int): Number of chat completions to sample per task
+        on_chunk (Callable[[ChatCompletionChunk, ChatCompletion], None] | None): Optional callback function for processing completion chunks
+        params (ChatCompletionParams | None): Additional parameters to pass to the chat completion API
+        pbar_desc (str | None): Description to display on the progress bar
+        prices (tuple[float, float] | None): Tuple of (input_price, output_price) per million tokens, for cost tracking
+        semaphore (asyncio.Semaphore | None): Optional semaphore for limiting concurrent API calls
+        token_scheduler (TokenScheduler | None): Optional token scheduler for rate limiting
+        transform (Callable[[TaskResult], T | Awaitable[T]]): Function to transform TaskResult objects before returning
+
+    Returns:
+        TaskResults[T]: Processed results and statistics
+
+    Process: Runs model inference → evaluates with graders → computes rewards/advantages →
+    tracks metrics → transforms results
+    """
     num_completions = len(tasks) * n
     pbar = tqdm.tqdm(total=num_completions, desc=pbar_desc)
     stats = TaskResultStats(pbar=pbar, prices=prices)
-
-    if log_token_logprobs or on_chunk:
-
-        def _on_chunk(chunk: ChatCompletionChunk, completion: ChatCompletion) -> None:
-            if log_token_logprobs:
-                stats.update(id=chunk.id, chunk=chunk)
-            if on_chunk:
-                on_chunk(chunk, completion)
-
-    else:
-        _on_chunk = None  # type: ignore
-    if isinstance(log_results, int) and log_results >= 1:
-        _log_results = [True] * log_results + [False] * max(len(tasks) - log_results, 0)
-    elif isinstance(log_results, float):
-        _log_results = [True] * int(log_results * len(tasks)) + [False] * (
-            len(tasks) - int(log_results * len(tasks))
-        )
-    else:
-        _log_results = [bool(log_results)] * len(tasks)
-    random.shuffle(_log_results)
     results = TaskResults(
         await asyncio.gather(
             *(
@@ -168,18 +215,22 @@ async def get_task_results(
                     task=task,
                     client=client,
                     model=model,
-                    log_results=log_result,
+                    log_results=log_results,
                     n=n,
                     cache=cache,
                     log_dir=log_dir,
-                    on_chunk=_on_chunk,
+                    on_chunk=_create_on_chunk_callback(
+                        log_token_logprobs, on_chunk, stats
+                    ),
                     semaphore=semaphore,
                     token_scheduler=token_scheduler,
                     params=params,
                     stats=stats,
                     transform=transform,
                 )
-                for task, log_result in zip(tasks, _log_results)
+                for task, log_results in zip(
+                    tasks, _get_log_results_flags(log_results, len(tasks))
+                )
             )
         )
     )
@@ -190,6 +241,36 @@ async def get_task_results(
     if getattr(pbar, "container", None) and print_pbar:
         print(pbar.container.__repr__(pretty=True))
     return results
+
+
+def _create_on_chunk_callback(
+    log_token_logprobs: bool,
+    on_chunk: Callable[[ChatCompletionChunk, ChatCompletion], None] | None,
+    stats: TaskResultStats,
+) -> Callable[[ChatCompletionChunk, ChatCompletion], None] | None:
+    "Create a callback function that logs token logprobs and/or calls the user's on_chunk callback if provided."
+    if not log_token_logprobs and not on_chunk:
+        return None
+
+    def _on_chunk(chunk: ChatCompletionChunk, completion: ChatCompletion) -> None:
+        if log_token_logprobs:
+            stats.update(id=chunk.id, chunk=chunk)
+        if on_chunk:
+            on_chunk(chunk, completion)
+
+    return _on_chunk
+
+
+def _get_log_results_flags(log_results: bool | float | int, n: int) -> list[bool]:
+    "Return a list of flags indicating whether to log results for each task."
+    if isinstance(log_results, int) and log_results >= 1:
+        result = [True] * log_results + [False] * max(n - log_results, 0)
+    elif isinstance(log_results, float):
+        result = [True] * int(log_results * n) + [False] * (n - int(log_results * n))
+    else:
+        result = [bool(log_results)] * n
+    random.shuffle(result)
+    return result
 
 
 async def _get_task_result(
@@ -207,6 +288,19 @@ async def _get_task_result(
     stats: TaskResultStats,
     transform: Callable[[TaskResult], T | Awaitable[T]],
 ) -> T:
+    """
+    Processes a single task by generating chat completions, grading responses, and calculating rewards.
+
+    This is a helper function called by get_task_results for each task in the list. It:
+    1. Makes n API calls to generate completions for the task
+    2. Collects all completions and passes them to the task's grader function
+    3. Tracks usage statistics and handles exceptions
+    4. Calculates GRPO advantages based on reward distribution
+    5. Applies the transform function to the TaskResult before returning
+
+    See get_task_results for parameter descriptions.
+    """
+    # always request logprobs, unless explicitly disabled
     _params = (params or {}).copy()
     if "logprobs" not in _params:
         _params["logprobs"] = True
@@ -261,6 +355,7 @@ async def _get_task_result(
     if rewards:
         reward_mean = np.mean(list(rewards.values()))
         reward_std = np.std(list(rewards.values()))
+        # calculate GRPO advantages
         advantages = {
             key: float((reward - reward_mean) / (reward_std + 1e-6))
             for key, reward in rewards.items()
