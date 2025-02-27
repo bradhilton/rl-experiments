@@ -17,6 +17,23 @@ async def consume_chat_completion_stream(
     stream: AsyncStream[ChatCompletionChunk],
     on_chunk: Callable[[ChatCompletionChunk, ChatCompletion], Any] | None = None,
 ) -> ChatCompletion:
+    """Consume a chat completion stream and build a complete ChatCompletion object.
+    
+    This function processes a stream of ChatCompletionChunks, constructing a complete
+    ChatCompletion object as if it was returned from a non-streaming API call.
+    Works with any OpenAI-compatible API implementation.
+    
+    Args:
+        stream: An AsyncStream of ChatCompletionChunk objects.
+        on_chunk: Optional callback that receives each chunk and the current state of the
+            ChatCompletion. If the callback raises StopIteration, the stream will close early.
+            
+    Returns:
+        A complete ChatCompletion object built from the streamed chunks.
+        
+    Raises:
+        AssertionError: If no chat completion object could be created.
+    """
     chat_completion: ChatCompletion | None = None
     async for chunk in stream:
         if chat_completion is None:

@@ -8,16 +8,11 @@ from openai.types.chat.chat_completion_chunk import ChatCompletionChunk
 from openai.types.chat.chat_completion_message_param import ChatCompletionMessageParam
 from openai.types.completion_usage import CompletionUsage
 import random
-from typing import Awaitable, Callable, Never, TypeVar
+from typing import Awaitable, Callable, TypeVar
 
-from .chat_completions import CreateParams, get_chat_completion, TokenScheduler
+from .chat_completions import get_chat_completion, TokenScheduler
+from .types import ChatCompletionParams
 from .tqdm import tqdm
-
-
-class ChatCompletionParams(CreateParams, total=False):
-    messages: Never  # type: ignore
-    model: Never  # type: ignore
-
 
 # A grader function returns a floating-point reward,
 # and optionally a dictionary of metrics as the second return value
@@ -39,151 +34,6 @@ class TaskResult:
     metrics: dict[tuple[str, int], dict[str, float]]
     advantages: dict[tuple[str, int], float]
     exceptions: list[Exception]
-
-
-T = TypeVar("T")
-
-
-class TaskResults(list[T]):
-    stats: "TaskResultStats"
-
-
-async def get_task_results(
-    tasks: list[Task],
-    client: AsyncOpenAI,
-    model: str,
-    cache: bool = True,
-    clear_pbar: bool = False,
-    print_pbar: bool = True,
-    log_dir: str | None = None,
-    log_results: bool | float | int = True,
-    log_token_logprobs: bool = True,
-    n: int = 1,
-    on_chunk: Callable[[ChatCompletionChunk, ChatCompletion], None] | None = None,
-    params: ChatCompletionParams | None = None,
-    pbar_desc: str | None = None,
-    prices: tuple[float, float] | None = None,
-    semaphore: asyncio.Semaphore | None = None,
-    token_scheduler: TokenScheduler | None = None,
-    transform: Callable[[TaskResult], T | Awaitable[T]] = lambda x: x,
-) -> TaskResults[T]:
-    num_completions = len(tasks) * n
-    pbar = tqdm.tqdm(total=num_completions, desc=pbar_desc)
-    stats = TaskResultStats(pbar=pbar, prices=prices)
-
-    if log_token_logprobs or on_chunk:
-
-        def _on_chunk(chunk: ChatCompletionChunk, completion: ChatCompletion) -> None:
-            if log_token_logprobs:
-                stats.update(id=chunk.id, chunk=chunk)
-            if on_chunk:
-                on_chunk(chunk, completion)
-
-    else:
-        _on_chunk = None  # type: ignore
-
-    async def get_task_result(
-        task: Task, client: AsyncOpenAI, model: str, log_results: bool
-    ) -> T:
-        _params = (params or {}).copy()
-        if "logprobs" not in _params:
-            _params["logprobs"] = True
-        elif _params["logprobs"] is None:
-            del _params["logprobs"]
-        chat_completions: list[ChatCompletion] = []
-        rewards: dict[tuple[str, int], float] = {}
-        metrics: dict[tuple[str, int], dict[str, float]] = {}
-        exceptions: list[Exception] = []
-        for chat_completion_future in asyncio.as_completed(
-            get_chat_completion(
-                client,
-                cache=cache,
-                log_dir=log_dir,
-                log_results=log_results and i == 0,
-                on_chunk=_on_chunk,
-                semaphore=semaphore,
-                token_scheduler=token_scheduler,
-                messages=task.messages,
-                model=model,
-                **_params,  # type: ignore
-            )
-            for i in range(n)
-        ):
-            try:
-                chat_completion = await chat_completion_future
-                chat_completions.append(chat_completion)
-                stats.update(id=chat_completion.id, usage=chat_completion.usage)
-
-                async def _grade(choice: Choice, grader: Grader) -> tuple[int, Grade]:
-                    return choice.index, await maybe_await(grader(choice))
-
-                for grade_future in asyncio.as_completed(
-                    _grade(choice, task.grader) for choice in chat_completion.choices
-                ):
-                    try:
-                        choice_index, grade = await grade_future
-                        reward, _metrics = (
-                            grade if isinstance(grade, tuple) else (grade, {})
-                        )
-                        stats.update(
-                            id=chat_completion.id, reward=reward, metrics=_metrics
-                        )
-                        rewards[chat_completion.id, choice_index] = reward
-                        metrics[chat_completion.id, choice_index] = _metrics
-                    except Exception as e:
-                        exceptions.append(e)
-                        stats.update(id=chat_completion.id, exception=e)
-                        continue
-            except Exception as e:
-                exceptions.append(e)
-                stats.update(id=None, exception=e)
-                continue
-        if rewards:
-            reward_mean = np.mean(list(rewards.values()))
-            reward_std = np.std(list(rewards.values()))
-            advantages = {
-                key: float((reward - reward_mean) / (reward_std + 1e-6))
-                for key, reward in rewards.items()
-            }
-        else:
-            advantages = {key: 0.0 for key in rewards.keys()}
-        return await maybe_await(
-            transform(
-                TaskResult(
-                    task=task,
-                    chat_completions=chat_completions,
-                    rewards=rewards,
-                    metrics=metrics,
-                    advantages=advantages,
-                    exceptions=exceptions,
-                )
-            )
-        )
-
-    if isinstance(log_results, int) and log_results >= 1:
-        _log_results = [True] * log_results + [False] * max(len(tasks) - log_results, 0)
-    elif isinstance(log_results, float):
-        _log_results = [True] * int(log_results * len(tasks)) + [False] * (
-            len(tasks) - int(log_results * len(tasks))
-        )
-    else:
-        _log_results = [bool(log_results)] * len(tasks)
-    random.shuffle(_log_results)
-    results = TaskResults(
-        await asyncio.gather(
-            *(
-                get_task_result(task, client, model, log_result)
-                for task, log_result in zip(tasks, _log_results)
-            )
-        )
-    )
-    results.stats = stats
-    pbar.close()
-    if getattr(pbar, "container", None) and clear_pbar:
-        pbar.container.close()
-    if getattr(pbar, "container", None) and print_pbar:
-        print(pbar.container.__repr__(pretty=True))
-    return results
 
 
 @dataclass
@@ -260,3 +110,172 @@ class TaskResultStats:
         if self.exceptions:
             postfix["exceptions"] = len(self.exceptions)
         self.pbar.set_postfix(postfix)
+
+
+T = TypeVar("T")
+
+
+class TaskResults(list[T]):
+    stats: TaskResultStats
+
+
+async def get_task_results(
+    tasks: list[Task],
+    client: AsyncOpenAI,
+    model: str,
+    cache: bool = True,
+    clear_pbar: bool = False,
+    print_pbar: bool = True,
+    log_dir: str | None = None,
+    log_results: bool | float | int = True,
+    log_token_logprobs: bool = True,
+    n: int = 1,
+    on_chunk: Callable[[ChatCompletionChunk, ChatCompletion], None] | None = None,
+    params: ChatCompletionParams | None = None,
+    pbar_desc: str | None = None,
+    prices: tuple[float, float] | None = None,
+    semaphore: asyncio.Semaphore | None = None,
+    token_scheduler: TokenScheduler | None = None,
+    transform: Callable[[TaskResult], T | Awaitable[T]] = lambda x: x,
+) -> TaskResults[T]:
+    num_completions = len(tasks) * n
+    pbar = tqdm.tqdm(total=num_completions, desc=pbar_desc)
+    stats = TaskResultStats(pbar=pbar, prices=prices)
+
+    if log_token_logprobs or on_chunk:
+
+        def _on_chunk(chunk: ChatCompletionChunk, completion: ChatCompletion) -> None:
+            if log_token_logprobs:
+                stats.update(id=chunk.id, chunk=chunk)
+            if on_chunk:
+                on_chunk(chunk, completion)
+
+    else:
+        _on_chunk = None  # type: ignore
+    if isinstance(log_results, int) and log_results >= 1:
+        _log_results = [True] * log_results + [False] * max(len(tasks) - log_results, 0)
+    elif isinstance(log_results, float):
+        _log_results = [True] * int(log_results * len(tasks)) + [False] * (
+            len(tasks) - int(log_results * len(tasks))
+        )
+    else:
+        _log_results = [bool(log_results)] * len(tasks)
+    random.shuffle(_log_results)
+    results = TaskResults(
+        await asyncio.gather(
+            *(
+                _get_task_result(
+                    task=task,
+                    client=client,
+                    model=model,
+                    log_results=log_result,
+                    n=n,
+                    cache=cache,
+                    log_dir=log_dir,
+                    on_chunk=_on_chunk,
+                    semaphore=semaphore,
+                    token_scheduler=token_scheduler,
+                    params=params,
+                    stats=stats,
+                    transform=transform,
+                )
+                for task, log_result in zip(tasks, _log_results)
+            )
+        )
+    )
+    results.stats = stats
+    pbar.close()
+    if getattr(pbar, "container", None) and clear_pbar:
+        pbar.container.close()
+    if getattr(pbar, "container", None) and print_pbar:
+        print(pbar.container.__repr__(pretty=True))
+    return results
+
+
+async def _get_task_result(
+    task: Task,
+    client: AsyncOpenAI,
+    model: str,
+    log_results: bool,
+    n: int,
+    cache: bool,
+    log_dir: str | None,
+    on_chunk: Callable[[ChatCompletionChunk, ChatCompletion], None] | None,
+    semaphore: asyncio.Semaphore | None,
+    token_scheduler: TokenScheduler | None,
+    params: ChatCompletionParams | None,
+    stats: TaskResultStats,
+    transform: Callable[[TaskResult], T | Awaitable[T]],
+) -> T:
+    _params = (params or {}).copy()
+    if "logprobs" not in _params:
+        _params["logprobs"] = True
+    elif _params["logprobs"] is None:
+        del _params["logprobs"]
+    chat_completions: list[ChatCompletion] = []
+    rewards: dict[tuple[str, int], float] = {}
+    metrics: dict[tuple[str, int], dict[str, float]] = {}
+    exceptions: list[Exception] = []
+    for chat_completion_future in asyncio.as_completed(
+        get_chat_completion(
+            client,
+            cache=cache,
+            log_dir=log_dir,
+            log_results=log_results and i == 0,
+            on_chunk=on_chunk,
+            semaphore=semaphore,
+            token_scheduler=token_scheduler,
+            messages=task.messages,
+            model=model,
+            **_params,  # type: ignore
+        )
+        for i in range(n)
+    ):
+        try:
+            chat_completion = await chat_completion_future
+            chat_completions.append(chat_completion)
+            stats.update(id=chat_completion.id, usage=chat_completion.usage)
+
+            async def _grade(choice: Choice, grader: Grader) -> tuple[int, Grade]:
+                return choice.index, await maybe_await(grader(choice))
+
+            for grade_future in asyncio.as_completed(
+                _grade(choice, task.grader) for choice in chat_completion.choices
+            ):
+                try:
+                    choice_index, grade = await grade_future
+                    reward, _metrics = (
+                        grade if isinstance(grade, tuple) else (grade, {})
+                    )
+                    stats.update(id=chat_completion.id, reward=reward, metrics=_metrics)
+                    rewards[chat_completion.id, choice_index] = reward
+                    metrics[chat_completion.id, choice_index] = _metrics
+                except Exception as e:
+                    exceptions.append(e)
+                    stats.update(id=chat_completion.id, exception=e)
+                    continue
+        except Exception as e:
+            exceptions.append(e)
+            stats.update(id=None, exception=e)
+            continue
+    if rewards:
+        reward_mean = np.mean(list(rewards.values()))
+        reward_std = np.std(list(rewards.values()))
+        advantages = {
+            key: float((reward - reward_mean) / (reward_std + 1e-6))
+            for key, reward in rewards.items()
+        }
+    else:
+        advantages = {key: 0.0 for key in rewards.keys()}
+    return await maybe_await(
+        transform(
+            TaskResult(
+                task=task,
+                chat_completions=chat_completions,
+                rewards=rewards,
+                metrics=metrics,
+                advantages=advantages,
+                exceptions=exceptions,
+            )
+        )
+    )
