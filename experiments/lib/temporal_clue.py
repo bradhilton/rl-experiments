@@ -17,7 +17,9 @@ def get_temporal_clue_puzzles() -> list[TemporalCluePuzzle]:
     return json.load(open("./data/bradhilton/temporal-clue/puzzles.json"))
 
 
-def get_temporal_clue_tasks(surprise_bonus: float = 0.0) -> Iterable[Task]:
+def get_temporal_clue_tasks(
+    reward_power: float = 1.0, surprise_bonus: float = 0.0
+) -> Iterable[Task]:
     for puzzle in get_temporal_clue_puzzles():
 
         def grader(
@@ -63,7 +65,7 @@ def get_temporal_clue_tasks(surprise_bonus: float = 0.0) -> Iterable[Task]:
                     return (
                         (1 - surprise_bonus) * acc + acc * surprise_bonus * surprise
                     ), metrics
-            return acc, metrics
+            return acc**reward_power, metrics
 
         yield Task(
             messages=[
