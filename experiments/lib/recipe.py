@@ -1325,9 +1325,7 @@ def recipe_main(cfg: TuneRecipeConfig) -> None:
             "Training is not distributed. If you want to train on multiple GPUs and are using the tune CLI, specify --nnodes 1 and --nproc_per_node [num_gpus]"
         )
     elif not torch.distributed.is_initialized():
-        torch.distributed.init_process_group(
-            backend="gloo" if cfg.device == "cpu" else "nccl"
-        )
+        torch.distributed.init_process_group(backend="cuda:nccl,cpu:gloo")
 
     if cfg.get("fsdp_cpu_offload", False):
         # Utilize all available CPU cores for intra-op parallelism. This provides ~2x
