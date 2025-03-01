@@ -43,7 +43,7 @@ class InferenceEarlyStop:
             return
         for token_logprob in chunk.choices[0].logprobs.content:
             if token_logprob.logprob is None or math.isnan(token_logprob.logprob):
-                continue
+                raise StopIteration()
             ewm_logprob = (
                 self.alpha * self.ewm_logprobs.get(completion.id, 0)
                 + (1 - self.alpha) * token_logprob.logprob
