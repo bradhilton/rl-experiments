@@ -201,9 +201,9 @@ def plot_packed_tensors(packed_tensors: PackedTensors) -> None:
         (packed_tensors["assistant_mask"], "Assistant Mask", "Assistant Mask", 6),
         (packed_tensors["advantages"], "Advantages", "Token Advantages", 7),
         (packed_tensors["weights"], "Weights", "Token Weights", 8),
-        (packed_tensors["deferred"], "Deferred", "Deferred", 9),
+        # (packed_tensors["deferred"], "Deferred", "Deferred", 9),
     ):
-        plt.subplot(5, 2, subplot_idx)
+        plt.subplot(4, 2, subplot_idx)
         sns.heatmap(
             tensor.numpy(), cmap="viridis", cbar_kws={"label": label}, xticklabels=False  # type: ignore
         )
