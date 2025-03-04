@@ -15,6 +15,7 @@ dependencies = [
     "obstore>=0.4.0",
     "openai>=1.61.1",
     "polars>=1.22.0",
+    "scikit-learn>=1.6.1",
     "seaborn>=0.13.2",
     "skypilot[cudo,do,gcp,lambda,runpod]",
     "torch>=2.5.1",
