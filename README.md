@@ -1,4 +1,4 @@
-# openpipe-rl
+# rl-experiments
 
 OpenPipe Reinforcement Learning Experiments
 
