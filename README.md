@@ -10,7 +10,7 @@ To learn more about our research, check out our [blog post](https://openpipe.ai/
 
 If you want to reproduce our work on deductive reasoning, take a look at our streamlined [training recipe here](https://github.com/openpipe/deductive-reasoning).
 
-If you're interested in training your own models with reinforcement learning or just chatting, feel free to [contact us](https://openpipe.ai/contact) or email Kyle at kyle@openpipe.ai!
+If you're interested in training your own models with reinforcement learning or just chatting, feel free to [reach out](https://openpipe.ai/contact) or email Kyle directly at kyle@openpipe.ai!
 
 ## Dependencies
 
