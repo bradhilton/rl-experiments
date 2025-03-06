@@ -1,6 +1,10 @@
-# rl-experiments
+# OpenPipe Reinforcement Learning Experiments
 
-OpenPipe Reinforcement Learning Experiments
+This repository contains a series of reinforcement learning experiments. Experiment notebooks can be found in the `/experiments` directory, along with library code and data. The repository also contains some helpful scripts for starting dev machines and other utilities.
+
+To learn more about our research, check out our [blogpost here](https://openpipe.ai/blog).
+
+If you want to reproduce our work on deductive reasoning, take a look at our streamlined [training recipe here](https://github.com/openpipe/deductive-reasoning).
 
 ## Dependencies
 
