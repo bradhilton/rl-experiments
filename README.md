@@ -1,12 +1,16 @@
 # OpenPipe Reinforcement Learning Experiments
 
-This repository contains a series of reinforcement learning experiments. Experiment notebooks can be found in the `/experiments` directory, along with library code and data. The repository also contains some helpful scripts for starting dev machines and other utilities.
+This repository contains a series of reinforcement learning experiments.
+
+Experiment notebooks can be found in the `/experiments` directory, along with library code and data. The repository also contains some helpful scripts for starting dev machines and other utilities.
+
+Experiment results can be viewed on [Weights & Biases](https://wandb.ai/bradhilton/rl-experiments).
 
 To learn more about our research, check out our [blog post](https://openpipe.ai/blog) at [OpenPipe](https://openpipe.ai).
 
 If you want to reproduce our work on deductive reasoning, take a look at our streamlined [training recipe here](https://github.com/openpipe/deductive-reasoning).
 
-If you're interested in training your own models with reinforcement learning or just chatting, feel free to [contact us](https://openpipe.ai/contact) or email our founder Kyle Corbitt directly at kyle@openpipe.ai!
+If you're interested in training your own models with reinforcement learning or just chatting, feel free to [contact us](https://openpipe.ai/contact) or email Kyle at kyle@openpipe.ai!
 
 ## Dependencies
 
