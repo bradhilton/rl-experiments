@@ -6,7 +6,7 @@ Experiment notebooks can be found in the `/experiments` directory, along with li
 
 Experiment results can be viewed on [Weights & Biases](https://wandb.ai/bradhilton/rl-experiments).
 
-To learn more about our research, check out our [blog post](https://openpipe.ai/blog) at [OpenPipe](https://openpipe.ai).
+To learn more about our research, check out our recent [blog post](https://openpipe.ai/blog/using-grpo-to-beat-o1-o3-mini-and-r1-on-temporal-clue) at [OpenPipe](https://openpipe.ai).
 
 If you want to reproduce our work on deductive reasoning, take a look at our streamlined [training recipe here](https://github.com/openpipe/deductive-reasoning).
 
