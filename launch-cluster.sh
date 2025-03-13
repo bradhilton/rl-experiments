@@ -18,4 +18,4 @@ if ! git pull; then
 fi
 
 # Launch the cluster
-sky launch cluster.yaml -c openpipe --env-file .env -y "$@"
+uv run sky launch cluster.yaml -c openpipe --env-file .env -y "$@"

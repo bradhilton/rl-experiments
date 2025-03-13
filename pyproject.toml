@@ -21,6 +21,7 @@ dependencies = [
     "torch>=2.5.1",
     "torchao>=0.8.0",
     "torchtune>=0.5.0",
+    "trl>=0.15.2",
     "vllm>=0.7.0",
     "wandb>=0.19.6",
 ]
@@ -33,4 +34,3 @@ dev-dependencies = [
 ]
 
 [tool.uv.sources]
-skypilot = { git = "https://github.com/skypilot-org/skypilot", rev = "9d8d7c6f6bc5482bd10c4c0f548786012c0a9b18" }
