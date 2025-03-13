@@ -4,6 +4,9 @@ __pycache__/
 .venv
 experiments/data/chat-completion-logs/
 experiments/data/chat-completions/
+experiments/grpo_trainer_lora_model/
 experiments/logs/
 experiments/models/
+experiments/outputs/
+experiments/unsloth_compiled_cache/
 experiments/wandb/
