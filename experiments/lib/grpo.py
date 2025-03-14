@@ -84,6 +84,7 @@ class GRPO(torch.nn.Module):
         entropy_coef: float = 0.0,
         kl_coef: float = 0.0,
         tanh: bool = False,
+        off_policy: bool = False,
     ) -> None:
         """
         Initialize the GRPO loss.
@@ -93,12 +94,14 @@ class GRPO(torch.nn.Module):
             entropy_coef (float): The coefficient for the entropy bonus.
             kl_coef (float): The coefficient for the KL divergence penalty.
             tanh (bool): Whether to use an alternative "soft" clipping method.
+            off_policy (bool): Whether to use an off-policy correction.
         """
         super().__init__()
         self.clip_epsilon = clip_epsilon
         self.entropy_coef = entropy_coef
         self.kl_coef = kl_coef
         self.tanh = tanh
+        self.off_policy = off_policy
 
     def forward(
         self,
@@ -234,6 +237,20 @@ class GRPO(torch.nn.Module):
             diff = torch.where(deferred, new_logprobs - new_logprobs.detach(), diff)
         if self.tanh:
             policy_loss = -torch.tanh(diff).mul(advantages)
+        elif self.off_policy:
+            behavior_logprobs = logprobs
+            logprobs = new_logprobs.detach()
+            prob_ratio = torch.exp(new_logprobs - logprobs)
+            importance_adjustment = torch.exp(logprobs - behavior_logprobs)
+            policy_loss = -torch.min(
+                prob_ratio * advantages,
+                torch.clip(
+                    prob_ratio,
+                    importance_adjustment * (1 - self.clip_epsilon),
+                    importance_adjustment * (1 + self.clip_epsilon),
+                )
+                * advantages,
+            )
         else:
             prob_ratio = torch.exp(diff)
             policy_loss = -torch.min(
