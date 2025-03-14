@@ -241,7 +241,7 @@ class GRPO(torch.nn.Module):
             behavior_logprobs = logprobs
             logprobs = new_logprobs.detach()
             prob_ratio = torch.exp(new_logprobs - logprobs)
-            importance_adjustment = torch.exp(logprobs - behavior_logprobs)
+            importance_adjustment = torch.exp(behavior_logprobs - logprobs)
             policy_loss = -torch.min(
                 prob_ratio * advantages,
                 torch.clip(
